@@ -8,7 +8,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strconv"
 	"time"
 
@@ -21,19 +20,39 @@ import (
 var assets embed.FS
 
 func main() {
-	baseURL, runtime, listener, err := startLocalKite()
+	paths, err := resolveDesktopPaths()
 	if err != nil {
-		log.Fatal(err)
+		failDesktopStartup(err)
+	}
+	if err := paths.ensure(); err != nil {
+		failDesktopStartup(err)
+	}
+
+	baseURL, runtime, listener, err := startLocalKite(paths)
+	if err != nil {
+		failDesktopStartup(err)
 	}
 	defer listener.Close()
+
+	var host *desktopHost
 
 	app := application.New(application.Options{
 		Name:        "Kite",
 		Description: "Modern Kubernetes Dashboard",
+		Icon:        desktopTrayIcon,
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),
 		},
+		SingleInstance: desktopSingleInstanceOptions(func() {
+			if host != nil {
+				host.focusMainWindow()
+			}
+		}),
 		OnShutdown: func() {
+			if host != nil {
+				host.persistStateOnShutdown()
+			}
+
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
 			if err := runtime.Shutdown(ctx); err != nil {
@@ -41,13 +60,15 @@ func main() {
 			}
 		},
 		Mac: application.MacOptions{
-			ApplicationShouldTerminateAfterLastWindowClosed: true,
+			ApplicationShouldTerminateAfterLastWindowClosed: false,
 		},
 	})
 
-	bridge, err := newDesktopBridge(app, baseURL)
+	host = newDesktopHost(app, baseURL, paths)
+
+	bridge, err := newDesktopBridge(app, baseURL, host)
 	if err != nil {
-		log.Fatal(err)
+		failDesktopStartup(err)
 	}
 	bridge.registerRoutes(runtime.Engine)
 
@@ -58,32 +79,20 @@ func main() {
 	}()
 
 	if err := waitForServer(serverHealthURL(baseURL)); err != nil {
-		log.Fatal(err)
+		failDesktopStartup(err)
 	}
 
-	app.Window.NewWithOptions(application.WebviewWindowOptions{
-		Name:               "main",
-		Title:              "Kite",
-		Width:              1480,
-		Height:             960,
-		MinWidth:           1100,
-		MinHeight:          760,
-		BackgroundColour:   application.NewRGB(250, 250, 248),
-		DevToolsEnabled:    true,
-		EnableFileDrop:     true,
-		UseApplicationMenu: true,
-		URL:                serverStartURL(baseURL),
-		Mac: application.MacWindow{
-			TitleBar: application.MacTitleBarHiddenInset,
-		},
-	})
+	mainWindow := app.Window.NewWithOptions(host.mainWindowOptions())
+	host.registerMainWindow(mainWindow)
+	host.setupApplicationMenu()
+	host.setupSystemTray()
 
 	if err := app.Run(); err != nil {
-		log.Fatal(err)
+		failDesktopStartup(err)
 	}
 }
 
-func startLocalKite() (string, *appserver.Runtime, net.Listener, error) {
+func startLocalKite(paths desktopPaths) (string, *appserver.Runtime, net.Listener, error) {
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		return "", nil, nil, fmt.Errorf("listen loopback failed: %w", err)
@@ -92,7 +101,7 @@ func startLocalKite() (string, *appserver.Runtime, net.Listener, error) {
 	addr := listener.Addr().(*net.TCPAddr)
 	baseURL := fmt.Sprintf("http://127.0.0.1:%d", addr.Port)
 
-	if err := configureDesktopEnv(addr.Port); err != nil {
+	if err := configureDesktopEnv(paths, addr.Port); err != nil {
 		_ = listener.Close()
 		return "", nil, nil, err
 	}
@@ -106,17 +115,9 @@ func startLocalKite() (string, *appserver.Runtime, net.Listener, error) {
 	return baseURL, runtime, listener, nil
 }
 
-func configureDesktopEnv(port int) error {
-	dataDir, err := desktopDataDir()
-	if err != nil {
-		return fmt.Errorf("resolve desktop data dir failed: %w", err)
-	}
-	if err := os.MkdirAll(dataDir, 0o755); err != nil {
-		return fmt.Errorf("create desktop data dir failed: %w", err)
-	}
-
+func configureDesktopEnv(paths desktopPaths, port int) error {
 	if os.Getenv("DB_DSN") == "" {
-		if err := os.Setenv("DB_DSN", filepath.Join(dataDir, "kite.db")); err != nil {
+		if err := os.Setenv("DB_DSN", paths.DBPath); err != nil {
 			return fmt.Errorf("set DB_DSN failed: %w", err)
 		}
 	}
@@ -127,19 +128,11 @@ func configureDesktopEnv(port int) error {
 	if err := os.Setenv("HOST", fmt.Sprintf("http://127.0.0.1:%d", port)); err != nil {
 		return fmt.Errorf("set HOST failed: %w", err)
 	}
-	if err := os.Setenv("ANONYMOUS_USER_ENABLED", "true"); err != nil {
-		return fmt.Errorf("set ANONYMOUS_USER_ENABLED failed: %w", err)
+	if err := os.Setenv("APP_RUNTIME", common.RuntimeDesktopLocal); err != nil {
+		return fmt.Errorf("set APP_RUNTIME failed: %w", err)
 	}
 
 	return nil
-}
-
-func desktopDataDir() (string, error) {
-	baseDir, err := os.UserConfigDir()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(baseDir, "Kite"), nil
 }
 
 func waitForServer(url string) error {
