@@ -217,6 +217,7 @@ jobs:
       - desktop-build
     permissions:
       contents: write
+      pull-requests: read
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -237,16 +238,70 @@ jobs:
           cd release-assets
           find . -maxdepth 1 -type f -printf '%P\n' | LC_ALL=C sort | xargs sha256sum > SHA256SUMS
 
-      - name: Generate release notes
+      - name: Build release notes header
+        id: release_header
         shell: bash
         run: |
           set -euo pipefail
-          chmod +x scripts/release/generate_release_notes.sh
-          scripts/release/generate_release_notes.sh \
-            "${{ needs.prepare.outputs.tag_name }}" \
-            "${{ github.repository }}" \
-            "release-assets" \
-            "release-notes.md"
+          TAG_NAME="${{ needs.prepare.outputs.tag_name }}"
+          REPOSITORY="${{ github.repository }}"
+          RELEASE_BASE_URL="https://github.com/${REPOSITORY}/releases/download/${TAG_NAME}"
+
+          emit_row() {
+            local platform="$1"
+            local architecture="$2"
+            local package_type="$3"
+            local filename="$4"
+
+            if [[ -f "release-assets/${filename}" ]]; then
+              printf '| %s | %s | %s | [`%s`](%s/%s) |\n' \
+                "${platform}" "${architecture}" "${package_type}" "${filename}" "${RELEASE_BASE_URL}" "${filename}"
+            fi
+          }
+
+          {
+            echo 'header<<EOF'
+            echo '## Downloads'
+            echo
+            echo '| Platform | Architecture | Package | Download |'
+            echo '| --- | --- | --- | --- |'
+            emit_row "Windows" "x64" "Installer" "Kite-${TAG_NAME}-windows-amd64-installer.exe"
+            emit_row "Windows" "ARM64" "Installer" "Kite-${TAG_NAME}-windows-arm64-installer.exe"
+            emit_row "macOS" "Intel" "DMG" "Kite-${TAG_NAME}-macos-intel.dmg"
+            emit_row "macOS" "Apple Silicon" "DMG" "Kite-${TAG_NAME}-macos-apple-silicon.dmg"
+            emit_row "Linux" "x64" "AppImage" "Kite-${TAG_NAME}-linux-amd64.AppImage"
+            emit_row "Linux" "x64" "DEB" "Kite-${TAG_NAME}-linux-amd64.deb"
+            emit_row "Linux" "x64" "RPM" "Kite-${TAG_NAME}-linux-amd64.rpm"
+            echo
+            if [[ -f release-assets/SHA256SUMS ]]; then
+              echo '## Checksums'
+              echo
+              echo "- [SHA256SUMS](${RELEASE_BASE_URL}/SHA256SUMS)"
+              echo
+            fi
+            echo 'EOF'
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Draft release notes
+        id: draft_release_notes
+        uses: release-drafter/release-drafter@v7
+        with:
+          tag: ${{ needs.prepare.outputs.tag_name }}
+          name: ${{ needs.prepare.outputs.release_name }}
+          version: ${{ needs.prepare.outputs.version }}
+          header: ${{ steps.release_header.outputs.header }}
+          config-name: release-drafter.yml
+          dry-run: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Write release notes
+        shell: bash
+        env:
+          RELEASE_NOTES: ${{ steps.draft_release_notes.outputs.body }}
+        run: |
+          set -euo pipefail
+          printf '%s\n' "${RELEASE_NOTES}" > release-notes.md
 
       - name: Create release
         uses: softprops/action-gh-release@v2
