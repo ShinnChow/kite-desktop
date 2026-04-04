@@ -70,6 +70,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v5
 
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
       - name: Setup Go
         uses: actions/setup-go@v6
         with:
@@ -81,6 +85,8 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
+          cache: "pnpm"
+          cache-dependency-path: ui/pnpm-lock.yaml
 
       - name: Install Wails v3
         shell: bash

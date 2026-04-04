@@ -26,6 +26,7 @@ tasks:
         vars:
           BUILD_FLAGS:
             ref: .BUILD_FLAGS
+      - task: common:build:webui
       - task: common:build:frontend
         vars:
           BUILD_FLAGS:

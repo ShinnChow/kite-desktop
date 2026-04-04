@@ -7,6 +7,33 @@ tasks:
     cmds:
       - go mod tidy
 
+  install:webui:deps:
+    summary: Install shared web UI dependencies
+    dir: ..
+    sources:
+      - ui/package.json
+      - ui/pnpm-lock.yaml
+    generates:
+      - ui/node_modules
+    preconditions:
+      - sh: pnpm version
+        msg: "Looks like pnpm isn't installed. Please install pnpm to build the shared web UI in ui/."
+    cmds:
+      - pnpm --dir ui install --frozen-lockfile
+
+  build:webui:
+    summary: Build the shared web UI for the embedded desktop server
+    dir: ..
+    sources:
+      - ui/**/*
+      - exclude: ui/node_modules/**/*
+    generates:
+      - internal/server/static/**/*
+    deps:
+      - task: install:webui:deps
+    cmds:
+      - pnpm --dir ui build
+
   install:frontend:deps:
     summary: Install frontend dependencies
     dir: frontend
