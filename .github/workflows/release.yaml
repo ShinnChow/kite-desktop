@@ -218,17 +218,17 @@ jobs:
     permissions:
       contents: write
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
       - name: Download desktop artifacts
         uses: actions/download-artifact@v4
         with:
           pattern: release-assets-*
           merge-multiple: true
           path: release-assets
-
-      - name: Checkout code
-        uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
 
       - name: Generate SHA256SUMS
         shell: bash
