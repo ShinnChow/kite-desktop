@@ -10,7 +10,7 @@ export function VersionInfo() {
     e.preventDefault()
     e.stopPropagation()
     // GitHub repository URL - you can modify this to match your repository
-    const repoUrl = 'https://github.com/zxh326/kite'
+    const repoUrl = 'https://github.com/kite-org/kite'
     const commitUrl = `${repoUrl}/commit/${versionInfo.commitId}`
     void openURL(commitUrl)
   }

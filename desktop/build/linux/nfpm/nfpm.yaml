@@ -12,7 +12,7 @@ priority: "extra"
 maintainer: ${GIT_COMMITTER_NAME} <${GIT_COMMITTER_EMAIL}>
 description: "Modern Kubernetes Desktop Dashboard"
 vendor: "Kite"
-homepage: "https://github.com/zxh326/kite"
+homepage: "https://github.com/kite-org/kite"
 license: "MIT"
 release: "1"
 

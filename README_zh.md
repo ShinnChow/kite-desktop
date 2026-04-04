@@ -2,7 +2,7 @@
 
 <div align="center">
 
-<img src="./docs/assets/logo.svg" alt="Kite Desktop Logo" width="128" height="128">
+<img src="./docs/src/logo.svg" alt="Kite Desktop Logo" width="128" height="128">
 
 _一个基于 Wails v3 打造、面向桌面端的 Kubernetes 管理应用_
 
@@ -12,7 +12,7 @@ _一个基于 Wails v3 打造、面向桌面端的 Kubernetes 管理应用_
 
 ## 致谢
 
-当前项目基于原始开源项目 [Kite](https://github.com/zxh326/kite) 改造而来。
+当前项目基于原始开源项目 [Kite](https://github.com/kite-org/kite) 改造而来。
 
 首先感谢原项目 Kite 的作者与所有贡献者。原项目已经提供了非常坚实的基础，包括 Kubernetes 资源管理能力、集群管理流程、后端能力以及整体产品方向。当前仓库的桌面化改造，正是建立在这些成果之上。
 

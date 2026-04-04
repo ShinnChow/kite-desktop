@@ -2,7 +2,7 @@
 
 <div align="center">
 
-<img src="./docs/assets/logo.svg" alt="Kite Desktop Logo" width="128" height="128">
+<img src="./docs/src/logo.svg" alt="Kite Desktop Logo" width="128" height="128">
 
 _A desktop-first Kubernetes management application rebuilt with Wails v3_
 
@@ -12,7 +12,7 @@ _A desktop-first Kubernetes management application rebuilt with Wails v3_
 
 ## Acknowledgement
 
-This project is based on the original open source project [Kite](https://github.com/zxh326/kite).
+This project is based on the original open source project [Kite](https://github.com/kite-org/kite).
 
 Special thanks to the original Kite authors and contributors. The upstream project provided the core product foundation, including Kubernetes resource management, cluster workflows, backend capabilities, and the initial product direction. This repository stands on top of that work.
 
