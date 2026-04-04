@@ -11,7 +11,6 @@ TAG_NAME="$1"
 REPOSITORY="$2"
 ASSETS_DIR="$3"
 OUTPUT_FILE="$4"
-VERSION="${TAG_NAME#v}"
 RELEASE_BASE_URL="https://github.com/${REPOSITORY}/releases/download/${TAG_NAME}"
 
 release_url() {
@@ -56,26 +55,6 @@ emit_download_row() {
     echo "## Checksums"
     echo
     echo "- [SHA256SUMS]($(release_url "SHA256SUMS"))"
-    echo
-  fi
-
-  local_server_assets=()
-  for candidate in \
-    "kite-amd64-${TAG_NAME}.tar.gz" \
-    "kite-arm64-${TAG_NAME}.tar.gz" \
-    "kite-${VERSION}.tgz"
-  do
-    if asset_exists "${candidate}"; then
-      local_server_assets+=("${candidate}")
-    fi
-  done
-
-  if [[ ${#local_server_assets[@]} -gt 0 ]]; then
-    echo "## Server Assets"
-    echo
-    for filename in "${local_server_assets[@]}"; do
-      printf -- '- [`%s`](%s)\n' "${filename}" "$(release_url "${filename}")"
-    done
     echo
   fi
 
