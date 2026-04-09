@@ -1,4 +1,11 @@
+<div align="center">
+
+<img src="./docs/src/banner.svg" alt="Kite Desktop Banner" width="900">
+
 # Kite Desktop
+
+</div>
+
 
 <div align="center">
 
