@@ -5,6 +5,7 @@
 *.so
 *.dylib
 .pnpm-store/
+.codex-cache/
 .claude
 #SQLite dev.db
 dev.db

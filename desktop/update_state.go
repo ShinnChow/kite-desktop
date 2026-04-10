@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/blang/semver/v4"
 	kiteversion "github.com/eryajf/kite-desktop/pkg/version"
 )
 
@@ -143,6 +144,18 @@ func (s *desktopUpdateStateStore) clearReadyToApply() error {
 	return s.persistLocked()
 }
 
+func (s *desktopUpdateStateStore) clearReadyToApplyIfApplied(currentVersion string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if !readyStateApplied(currentVersion, s.state.ReadyToApply) {
+		return nil
+	}
+
+	s.state.ReadyToApply = nil
+	return s.persistLocked()
+}
+
 func (s *desktopUpdateStateStore) persistLocked() error {
 	payload, err := json.MarshalIndent(s.state, "", "  ")
 	if err != nil {
@@ -233,4 +246,29 @@ func normalizeReadyState(state *desktopUpdateReadyState) *desktopUpdateReadyStat
 		return nil
 	}
 	return cloned
+}
+
+func readyStateApplied(currentVersion string, ready *desktopUpdateReadyState) bool {
+	if ready == nil {
+		return false
+	}
+
+	current := normalizeStoredVersion(currentVersion)
+	target := normalizeStoredVersion(ready.Version)
+	if current == "" || target == "" {
+		return false
+	}
+	if current == target {
+		return true
+	}
+
+	currentSemver, err := semver.Parse(current)
+	if err != nil {
+		return false
+	}
+	targetSemver, err := semver.Parse(target)
+	if err != nil {
+		return false
+	}
+	return currentSemver.GT(targetSemver)
 }

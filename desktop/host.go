@@ -148,12 +148,15 @@ func (s *desktopWindowStateStore) save(state desktopWindowState) error {
 }
 
 func newDesktopHost(app *application.App, baseURL string, paths desktopPaths) *desktopHost {
+	updateStore := newDesktopUpdateStateStore(paths.UpdateStatePath)
+	_ = updateStore.clearReadyToApplyIfApplied(kiteversion.Version)
+
 	return &desktopHost{
 		app:             app,
 		baseURL:         baseURL,
 		paths:           paths,
 		stateStore:      newDesktopWindowStateStore(paths.WindowStatePath),
-		updateStore:     newDesktopUpdateStateStore(paths.UpdateStatePath),
+		updateStore:     updateStore,
 		downloadManager: newDesktopUpdateDownloadManager(),
 	}
 }
