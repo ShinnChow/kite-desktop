@@ -57,6 +57,30 @@ func TestDesktopUpdateStateStorePersistsIgnoreAndLastCheck(t *testing.T) {
 	}
 }
 
+func TestDesktopUpdateStateStoreClearsReadyStateAfterAppliedVersion(t *testing.T) {
+	store := newDesktopUpdateStateStore(filepath.Join(t.TempDir(), "update-state.json"))
+	packagePath := filepath.Join(t.TempDir(), "Kite-v0.1.5-macos-apple-silicon.zip")
+	if err := os.WriteFile(packagePath, []byte("payload"), 0o644); err != nil {
+		t.Fatalf("os.WriteFile() error = %v", err)
+	}
+	if err := store.saveReadyToApply(desktopUpdateReadyState{
+		Version:   "0.1.5",
+		AssetName: filepath.Base(packagePath),
+		Path:      packagePath,
+	}); err != nil {
+		t.Fatalf("saveReadyToApply() error = %v", err)
+	}
+
+	if err := store.clearReadyToApplyIfApplied("0.1.5"); err != nil {
+		t.Fatalf("clearReadyToApplyIfApplied() error = %v", err)
+	}
+
+	state := store.load()
+	if state.ReadyToApply != nil {
+		t.Fatalf("ReadyToApply = %#v, want nil", state.ReadyToApply)
+	}
+}
+
 func TestDesktopHostDownloadUpdateCreatesReadyState(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte("kite update payload"))
@@ -120,4 +144,49 @@ func TestDesktopHostDownloadUpdateCreatesReadyState(t *testing.T) {
 	}
 
 	t.Fatal("timed out waiting for update download to complete")
+}
+
+func TestNewDesktopHostClearsAppliedReadyStateOnStartup(t *testing.T) {
+	origVersion := kiteversion.Version
+	kiteversion.Version = "0.1.5"
+	defer func() {
+		kiteversion.Version = origVersion
+	}()
+
+	baseDir := t.TempDir()
+	paths := desktopPaths{
+		DataDir:         baseDir,
+		LogsDir:         filepath.Join(baseDir, "logs"),
+		CacheDir:        filepath.Join(baseDir, "cache"),
+		TempDir:         filepath.Join(baseDir, "tmp"),
+		DBPath:          filepath.Join(baseDir, "kite.db"),
+		WindowStatePath: filepath.Join(baseDir, "window-state.json"),
+		UpdateStatePath: filepath.Join(baseDir, "update-state.json"),
+	}
+	if err := paths.ensure(); err != nil {
+		t.Fatalf("paths.ensure() error = %v", err)
+	}
+
+	packagePath := filepath.Join(paths.TempDir, "updates", "Kite-v0.1.5-macos-apple-silicon.zip")
+	if err := os.MkdirAll(filepath.Dir(packagePath), 0o755); err != nil {
+		t.Fatalf("os.MkdirAll() error = %v", err)
+	}
+	if err := os.WriteFile(packagePath, []byte("payload"), 0o644); err != nil {
+		t.Fatalf("os.WriteFile() error = %v", err)
+	}
+
+	store := newDesktopUpdateStateStore(paths.UpdateStatePath)
+	if err := store.saveReadyToApply(desktopUpdateReadyState{
+		Version:   "0.1.5",
+		AssetName: filepath.Base(packagePath),
+		Path:      packagePath,
+	}); err != nil {
+		t.Fatalf("saveReadyToApply() error = %v", err)
+	}
+
+	host := newDesktopHost(nil, "", paths)
+	state := host.updateState()
+	if state.ReadyToApply != nil {
+		t.Fatalf("ReadyToApply = %#v, want nil", state.ReadyToApply)
+	}
 }
