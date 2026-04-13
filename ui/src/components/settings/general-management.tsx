@@ -26,8 +26,7 @@ import { Switch } from '@/components/ui/switch'
 const DEFAULT_MODEL = 'gpt-4o-mini'
 const DEFAULT_ANTHROPIC_MODEL = 'claude-sonnet-4-5'
 const DEFAULT_KUBECTL_IMAGE = 'docker.cnb.cool/znb/images/kubectl:latest'
-const DEFAULT_NODE_TERMINAL_IMAGE =
-  'docker.cnb.cool/znb/images/busybox:latest'
+const DEFAULT_NODE_TERMINAL_IMAGE = 'docker.cnb.cool/znb/images/busybox:latest'
 
 interface GeneralSettingsFormData {
   aiAgentEnabled: boolean
@@ -37,6 +36,7 @@ interface GeneralSettingsFormData {
   aiApiKeyConfigured: boolean
   aiBaseUrl: string
   aiMaxTokens: number
+  aiChatHistorySessionLimit: number
   kubectlEnabled: boolean
   kubectlImage: string
   nodeTerminalImage: string
@@ -56,6 +56,7 @@ export function GeneralManagement() {
     aiApiKeyConfigured: false,
     aiBaseUrl: '',
     aiMaxTokens: 4096,
+    aiChatHistorySessionLimit: 200,
     kubectlEnabled: true,
     kubectlImage: DEFAULT_KUBECTL_IMAGE,
     nodeTerminalImage: DEFAULT_NODE_TERMINAL_IMAGE,
@@ -73,6 +74,7 @@ export function GeneralManagement() {
       aiApiKeyConfigured: data.aiApiKeyConfigured ?? false,
       aiBaseUrl: data.aiBaseUrl || '',
       aiMaxTokens: data.aiMaxTokens || 4096,
+      aiChatHistorySessionLimit: data.aiChatHistorySessionLimit || 200,
       kubectlEnabled: data.kubectlEnabled ?? true,
       kubectlImage: data.kubectlImage || DEFAULT_KUBECTL_IMAGE,
       nodeTerminalImage: data.nodeTerminalImage || DEFAULT_NODE_TERMINAL_IMAGE,
@@ -149,6 +151,7 @@ export function GeneralManagement() {
       aiModel: formData.aiModel.trim() || defaultModel,
       aiBaseUrl: formData.aiBaseUrl.trim(),
       aiMaxTokens: formData.aiMaxTokens || 4096,
+      aiChatHistorySessionLimit: formData.aiChatHistorySessionLimit || 200,
       kubectlEnabled: formData.kubectlEnabled,
       kubectlImage: formData.kubectlImage.trim() || DEFAULT_KUBECTL_IMAGE,
       nodeTerminalImage:
@@ -329,6 +332,35 @@ export function GeneralManagement() {
                   }
                   placeholder="4096"
                 />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="general-ai-history-session-limit">
+                  {t(
+                    'generalManagement.aiAgent.form.chatHistorySessionLimit',
+                    'Chat History Session Limit'
+                  )}
+                </Label>
+                <Input
+                  id="general-ai-history-session-limit"
+                  type="number"
+                  min="1"
+                  value={formData.aiChatHistorySessionLimit}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      aiChatHistorySessionLimit:
+                        parseInt(e.target.value) || 200,
+                    }))
+                  }
+                  placeholder="200"
+                />
+                <p className="text-xs text-muted-foreground">
+                  {t(
+                    'generalManagement.aiAgent.form.chatHistorySessionLimitHint',
+                    'Maximum number of AI chat sessions to keep per cluster.'
+                  )}
+                </p>
               </div>
             </div>
           )}

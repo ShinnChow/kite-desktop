@@ -196,33 +196,35 @@ func HandleGetGeneralSetting(c *gin.Context) {
 	}
 	hasAIAPIKey := strings.TrimSpace(string(setting.AIAPIKey)) != ""
 	c.JSON(http.StatusOK, gin.H{
-		"aiAgentEnabled":     setting.AIAgentEnabled,
-		"aiProvider":         setting.AIProvider,
-		"aiModel":            setting.AIModel,
-		"aiApiKey":           "",
-		"aiApiKeyConfigured": hasAIAPIKey,
-		"aiBaseUrl":          setting.AIBaseURL,
-		"aiMaxTokens":        setting.AIMaxTokens,
-		"kubectlEnabled":     setting.KubectlEnabled,
-		"kubectlImage":       setting.KubectlImage,
-		"nodeTerminalImage":  setting.NodeTerminalImage,
-		"enableAnalytics":    setting.EnableAnalytics,
-		"enableVersionCheck": setting.EnableVersionCheck,
+		"aiAgentEnabled":            setting.AIAgentEnabled,
+		"aiProvider":                setting.AIProvider,
+		"aiModel":                   setting.AIModel,
+		"aiApiKey":                  "",
+		"aiApiKeyConfigured":        hasAIAPIKey,
+		"aiBaseUrl":                 setting.AIBaseURL,
+		"aiMaxTokens":               setting.AIMaxTokens,
+		"aiChatHistorySessionLimit": setting.AIChatHistorySessionLimit,
+		"kubectlEnabled":            setting.KubectlEnabled,
+		"kubectlImage":              setting.KubectlImage,
+		"nodeTerminalImage":         setting.NodeTerminalImage,
+		"enableAnalytics":           setting.EnableAnalytics,
+		"enableVersionCheck":        setting.EnableVersionCheck,
 	})
 }
 
 type UpdateGeneralSettingRequest struct {
-	AIAgentEnabled     bool    `json:"aiAgentEnabled"`
-	AIProvider         string  `json:"aiProvider"`
-	AIModel            string  `json:"aiModel"`
-	AIAPIKey           *string `json:"aiApiKey"`
-	AIBaseURL          string  `json:"aiBaseUrl"`
-	AIMaxTokens        int     `json:"aiMaxTokens"`
-	KubectlEnabled     bool    `json:"kubectlEnabled"`
-	KubectlImage       string  `json:"kubectlImage"`
-	NodeTerminalImage  string  `json:"nodeTerminalImage"`
-	EnableAnalytics    bool    `json:"enableAnalytics"`
-	EnableVersionCheck bool    `json:"enableVersionCheck"`
+	AIAgentEnabled            bool    `json:"aiAgentEnabled"`
+	AIProvider                string  `json:"aiProvider"`
+	AIModel                   string  `json:"aiModel"`
+	AIAPIKey                  *string `json:"aiApiKey"`
+	AIBaseURL                 string  `json:"aiBaseUrl"`
+	AIMaxTokens               int     `json:"aiMaxTokens"`
+	AIChatHistorySessionLimit int     `json:"aiChatHistorySessionLimit"`
+	KubectlEnabled            bool    `json:"kubectlEnabled"`
+	KubectlImage              string  `json:"kubectlImage"`
+	NodeTerminalImage         string  `json:"nodeTerminalImage"`
+	EnableAnalytics           bool    `json:"enableAnalytics"`
+	EnableVersionCheck        bool    `json:"enableVersionCheck"`
 }
 
 func HandleUpdateGeneralSetting(c *gin.Context) {
@@ -285,18 +287,20 @@ func HandleUpdateGeneralSetting(c *gin.Context) {
 	if aiMaxTokens <= 0 {
 		aiMaxTokens = 4096
 	}
+	aiChatHistorySessionLimit := model.NormalizeAIChatHistorySessionLimit(req.AIChatHistorySessionLimit)
 
 	updates := map[string]interface{}{
-		"ai_agent_enabled":     req.AIAgentEnabled,
-		"ai_provider":          aiProvider,
-		"ai_model":             aiModel,
-		"ai_base_url":          strings.TrimSpace(req.AIBaseURL),
-		"ai_max_tokens":        aiMaxTokens,
-		"kubectl_enabled":      req.KubectlEnabled,
-		"kubectl_image":        kubectlImage,
-		"node_terminal_image":  nodeTerminalImage,
-		"enable_analytics":     req.EnableAnalytics,
-		"enable_version_check": req.EnableVersionCheck,
+		"ai_agent_enabled":              req.AIAgentEnabled,
+		"ai_provider":                   aiProvider,
+		"ai_model":                      aiModel,
+		"ai_base_url":                   strings.TrimSpace(req.AIBaseURL),
+		"ai_max_tokens":                 aiMaxTokens,
+		"ai_chat_history_session_limit": aiChatHistorySessionLimit,
+		"kubectl_enabled":               req.KubectlEnabled,
+		"kubectl_image":                 kubectlImage,
+		"node_terminal_image":           nodeTerminalImage,
+		"enable_analytics":              req.EnableAnalytics,
+		"enable_version_check":          req.EnableVersionCheck,
 	}
 	if shouldUpdateAIAPIKey {
 		updates["ai_api_key"] = model.SecretString(aiAPIKey)
@@ -310,18 +314,19 @@ func HandleUpdateGeneralSetting(c *gin.Context) {
 
 	hasAIAPIKey := strings.TrimSpace(string(updated.AIAPIKey)) != ""
 	c.JSON(http.StatusOK, gin.H{
-		"aiAgentEnabled":     updated.AIAgentEnabled,
-		"aiProvider":         updated.AIProvider,
-		"aiModel":            updated.AIModel,
-		"aiApiKey":           "",
-		"aiApiKeyConfigured": hasAIAPIKey,
-		"aiBaseUrl":          updated.AIBaseURL,
-		"aiMaxTokens":        updated.AIMaxTokens,
-		"kubectlEnabled":     updated.KubectlEnabled,
-		"kubectlImage":       updated.KubectlImage,
-		"nodeTerminalImage":  updated.NodeTerminalImage,
-		"enableAnalytics":    updated.EnableAnalytics,
-		"enableVersionCheck": updated.EnableVersionCheck,
+		"aiAgentEnabled":            updated.AIAgentEnabled,
+		"aiProvider":                updated.AIProvider,
+		"aiModel":                   updated.AIModel,
+		"aiApiKey":                  "",
+		"aiApiKeyConfigured":        hasAIAPIKey,
+		"aiBaseUrl":                 updated.AIBaseURL,
+		"aiMaxTokens":               updated.AIMaxTokens,
+		"aiChatHistorySessionLimit": updated.AIChatHistorySessionLimit,
+		"kubectlEnabled":            updated.KubectlEnabled,
+		"kubectlImage":              updated.KubectlImage,
+		"nodeTerminalImage":         updated.NodeTerminalImage,
+		"enableAnalytics":           updated.EnableAnalytics,
+		"enableVersionCheck":        updated.EnableVersionCheck,
 	})
 }
 

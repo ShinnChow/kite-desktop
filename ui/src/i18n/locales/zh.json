@@ -544,6 +544,8 @@
         "apiKeyPlaceholder": "留空将保持当前 API Key",
         "baseUrl": "Base URL",
         "maxTokens": "最大 Token 数",
+        "chatHistorySessionLimit": "聊天历史会话上限",
+        "chatHistorySessionLimitHint": "每个集群最多保留多少条 AI 对话会话。",
         "providers": {
           "openai": "OpenAI",
           "anthropic": "Anthropic"

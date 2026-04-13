@@ -103,6 +103,10 @@ func registerProtectedRoutes(r *gin.RouterGroup, cm *cluster.ClusterManager) {
 	api.POST("/ai/chat", ai.HandleChat)
 	api.POST("/ai/execute/continue", ai.HandleExecuteContinue)
 	api.POST("/ai/input/continue", ai.HandleInputContinue)
+	api.GET("/ai/sessions", ai.HandleListSessions)
+	api.GET("/ai/sessions/:sessionId", ai.HandleGetSession)
+	api.PUT("/ai/sessions/:sessionId", ai.HandleUpsertSession)
+	api.DELETE("/ai/sessions/:sessionId", ai.HandleDeleteSession)
 
 	resources.RegisterRoutes(api)
 }

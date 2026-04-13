@@ -363,6 +363,7 @@ export interface GeneralSetting {
   aiApiKeyConfigured: boolean
   aiBaseUrl: string
   aiMaxTokens: number
+  aiChatHistorySessionLimit: number
   kubectlEnabled: boolean
   kubectlImage: string
   nodeTerminalImage: string
@@ -377,6 +378,7 @@ export interface GeneralSettingUpdateRequest {
   aiApiKey?: string
   aiBaseUrl?: string
   aiMaxTokens?: number
+  aiChatHistorySessionLimit?: number
   kubectlEnabled?: boolean
   kubectlImage?: string
   nodeTerminalImage?: string
