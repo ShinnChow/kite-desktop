@@ -5,6 +5,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/eryajf/kite-desktop/pkg/cluster"
@@ -58,12 +59,16 @@ func TestDesktopPreferenceAndSettingRoutesExist(t *testing.T) {
 		{http.MethodGet, "/api/v1/settings/general"},
 		{http.MethodPut, "/api/v1/settings/general"},
 		{http.MethodPost, "/api/v1/admin/clusters/test"},
+		{http.MethodGet, "/api/v1/ai/sessions"},
+		{http.MethodGet, "/api/v1/ai/sessions/test-session"},
+		{http.MethodPut, "/api/v1/ai/sessions/test-session"},
+		{http.MethodDelete, "/api/v1/ai/sessions/test-session"},
 	} {
 		req := httptest.NewRequest(tc.method, tc.path, nil)
 		rec := httptest.NewRecorder()
 		r.ServeHTTP(rec, req)
 
-		if rec.Code == http.StatusNotFound {
+		if rec.Code == http.StatusNotFound && strings.Contains(rec.Body.String(), "404 page not found") {
 			t.Fatalf("%s %s returned 404, want registered route", tc.method, tc.path)
 		}
 	}

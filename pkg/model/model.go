@@ -101,6 +101,8 @@ func InitDB() {
 		ResourceHistory{},
 		ResourceTemplate{},
 		PendingSession{},
+		AIChatSession{},
+		AIChatMessage{},
 	}
 	for _, model := range models {
 		err = DB.AutoMigrate(model)

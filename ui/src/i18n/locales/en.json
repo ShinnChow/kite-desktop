@@ -448,7 +448,9 @@
         "apiKey": "API Key",
         "apiKeyPlaceholder": "Leave empty to keep current API Key",
         "baseUrl": "Base URL",
-        "maxTokens": "Max Tokens"
+        "maxTokens": "Max Tokens",
+        "chatHistorySessionLimit": "Chat History Session Limit",
+        "chatHistorySessionLimitHint": "Maximum number of AI chat sessions to keep per cluster."
       }
     },
     "kubectl": {

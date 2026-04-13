@@ -1,5 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
+import {
+  AIChatMessagePayload,
+  AIChatPageContextPayload,
+  AIChatSessionDetailPayload,
+  AIChatSessionSummaryPayload,
+  deleteChatSession,
+  getChatSession,
+  listChatSessions,
+  upsertChatSession,
+} from '@/lib/api/ai-history'
 import { withSubPath } from '@/lib/subpath'
 
 export interface ChatMessage {
@@ -56,21 +66,24 @@ export interface PageContext {
 export interface ChatSession {
   id: string
   title: string
-  messages: ChatMessage[]
   createdAt: number
   updatedAt: number
   clusterName?: string
+  messageCount: number
+  pageContext?: PageContext
+  messages?: ChatMessage[]
 }
 
 type APIChatMessage = { role: 'user' | 'assistant'; content: string }
 
 const HISTORY_STORAGE_KEY_PREFIX = 'ai-chat-history-'
+const LEGACY_HISTORY_STORAGE_KEY = `${HISTORY_STORAGE_KEY_PREFIX}desktop`
+const HISTORY_MIGRATION_STORAGE_KEY_PREFIX = 'ai-chat-history-migrated-v1-'
 const MAX_HISTORY_SESSIONS = 50
 
-function loadHistoryFromStorage(username: string): ChatSession[] {
+function loadLegacyHistoryFromStorage(): ChatSession[] {
   try {
-    const key = `${HISTORY_STORAGE_KEY_PREFIX}${username || 'anonymous'}`
-    const stored = localStorage.getItem(key)
+    const stored = localStorage.getItem(LEGACY_HISTORY_STORAGE_KEY)
     if (!stored) return []
     return JSON.parse(stored)
   } catch {
@@ -78,13 +91,16 @@ function loadHistoryFromStorage(username: string): ChatSession[] {
   }
 }
 
-function saveHistoryToStorage(username: string, sessions: ChatSession[]) {
-  try {
-    const key = `${HISTORY_STORAGE_KEY_PREFIX}${username || 'anonymous'}`
-    localStorage.setItem(key, JSON.stringify(sessions))
-  } catch {
-    // ignore storage errors
-  }
+function getMigrationStorageKey(clusterName: string) {
+  return `${HISTORY_MIGRATION_STORAGE_KEY_PREFIX}${clusterName || 'default'}`
+}
+
+function hasLegacyHistoryMigrated(clusterName: string) {
+  return localStorage.getItem(getMigrationStorageKey(clusterName)) === 'true'
+}
+
+function markLegacyHistoryMigrated(clusterName: string) {
+  localStorage.setItem(getMigrationStorageKey(clusterName), 'true')
 }
 
 // TODO: generate session title with AI to better summarize the conversation, instead of just using the first user message
@@ -95,28 +111,109 @@ function generateSessionTitle(messages: ChatMessage[]): string {
   return content.length > 50 ? content.slice(0, 50) + '...' : content
 }
 
+function parseTimestamp(value: string): number {
+  const parsed = Date.parse(value)
+  return Number.isNaN(parsed) ? Date.now() : parsed
+}
+
+function toPageContext(
+  pageContext?: AIChatPageContextPayload | null
+): PageContext | undefined {
+  if (!pageContext) return undefined
+  return {
+    page: pageContext.page || '',
+    namespace: pageContext.namespace || '',
+    resourceName: pageContext.resourceName || '',
+    resourceKind: pageContext.resourceKind || '',
+  }
+}
+
+function toChatSession(
+  session: AIChatSessionSummaryPayload | AIChatSessionDetailPayload
+): ChatSession {
+  return {
+    id: session.sessionId,
+    title: session.title,
+    createdAt: parseTimestamp(session.createdAt),
+    updatedAt: parseTimestamp(session.updatedAt),
+    clusterName: session.clusterName || '',
+    messageCount: session.messageCount,
+    pageContext: toPageContext(session.pageContext),
+    messages:
+      'messages' in session
+        ? session.messages.map((message) => ({
+            id: message.id,
+            role: message.role,
+            content: message.content,
+            thinking: message.thinking,
+            toolCallId: message.toolCallId,
+            toolName: message.toolName,
+            toolArgs: message.toolArgs,
+            toolResult: message.toolResult,
+            inputRequest: message.inputRequest as ChatMessage['inputRequest'],
+            pendingAction:
+              message.pendingAction as ChatMessage['pendingAction'],
+            actionStatus: message.actionStatus,
+          }))
+        : undefined,
+  }
+}
+
+function toAPIPageContext(pageContext: PageContext): AIChatPageContextPayload {
+  return {
+    page: pageContext.page,
+    namespace: pageContext.namespace,
+    resourceName: pageContext.resourceName,
+    resourceKind: pageContext.resourceKind,
+  }
+}
+
+function toAPIMessage(message: ChatMessage): AIChatMessagePayload {
+  return {
+    id: message.id,
+    role: message.role,
+    content: message.content,
+    thinking: message.thinking,
+    toolCallId: message.toolCallId,
+    toolName: message.toolName,
+    toolArgs: message.toolArgs,
+    toolResult: message.toolResult,
+    inputRequest: message.inputRequest as Record<string, unknown> | undefined,
+    pendingAction: message.pendingAction as Record<string, unknown> | undefined,
+    actionStatus: message.actionStatus,
+  }
+}
+
 export function useAIChat() {
-  const username = 'desktop'
+  const currentCluster = localStorage.getItem('current-cluster') || ''
 
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null)
   const [history, setHistory] = useState<ChatSession[]>([])
   const messagesRef = useRef<ChatMessage[]>([])
+  const currentSessionIdRef = useRef<string | null>(null)
+  const lastPageContextRef = useRef<PageContext>({
+    page: 'overview',
+    namespace: '',
+    resourceName: '',
+    resourceKind: '',
+  })
   const abortControllerRef = useRef<AbortController | null>(null)
   const activeAssistantMsgIdRef = useRef<string | null>(null)
   const startNewAssistantSegmentRef = useRef(false)
 
-  // Load history when username becomes available or changes
-  // TODO: save in backend.
   useEffect(() => {
-    if (username) {
-      setHistory(loadHistoryFromStorage(username))
-    }
-  }, [username])
+    currentSessionIdRef.current = currentSessionId
+  }, [currentSessionId])
 
   const generateId = () =>
     `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
+
+  const replaceMessages = useCallback((next: ChatMessage[]) => {
+    messagesRef.current = next
+    setMessages(next)
+  }, [])
 
   const updateMessages = useCallback(
     (updater: (prev: ChatMessage[]) => ChatMessage[]) => {
@@ -129,69 +226,173 @@ export function useAIChat() {
     []
   )
 
-  const upsertSession = useCallback(
-    (sessionId: string, sessionMessages: ChatMessage[]) => {
+  const mergeHistorySession = useCallback((session: ChatSession) => {
+    setHistory((prev) => {
+      const existingIndex = prev.findIndex((item) => item.id === session.id)
+      let updated = [...prev]
+      if (existingIndex >= 0) {
+        updated[existingIndex] = {
+          ...updated[existingIndex],
+          ...session,
+          createdAt: updated[existingIndex].createdAt || session.createdAt,
+        }
+      } else {
+        updated = [session, ...updated]
+      }
+
+      updated.sort((a, b) => b.updatedAt - a.updatedAt)
+      if (updated.length > MAX_HISTORY_SESSIONS) {
+        updated = updated.slice(0, MAX_HISTORY_SESSIONS)
+      }
+      return updated
+    })
+  }, [])
+
+  const upsertHistorySummary = useCallback(
+    (
+      sessionId: string,
+      sessionMessages: ChatMessage[],
+      pageContext: PageContext,
+      createdAt?: number
+    ) => {
       if (!sessionId || sessionMessages.length === 0) return
 
       const now = Date.now()
-      const title = generateSessionTitle(sessionMessages)
-      const clusterName = localStorage.getItem('current-cluster') || ''
-
-      setHistory((prev) => {
-        const existingIndex = prev.findIndex((s) => s.id === sessionId)
-        const session: ChatSession = {
-          id: sessionId,
-          title,
-          messages: sessionMessages,
-          createdAt: existingIndex >= 0 ? prev[existingIndex].createdAt : now,
-          updatedAt: now,
-          clusterName,
-        }
-
-        let updated: ChatSession[]
-        if (existingIndex >= 0) {
-          updated = [...prev]
-          updated[existingIndex] = session
-        } else {
-          updated = [session, ...prev]
-        }
-
-        if (updated.length > MAX_HISTORY_SESSIONS) {
-          updated = updated.slice(0, MAX_HISTORY_SESSIONS)
-        }
-
-        saveHistoryToStorage(username, updated)
-        return updated
+      mergeHistorySession({
+        id: sessionId,
+        title: generateSessionTitle(sessionMessages),
+        createdAt: createdAt || now,
+        updatedAt: now,
+        clusterName: localStorage.getItem('current-cluster') || '',
+        messageCount: sessionMessages.length,
+        pageContext,
       })
     },
-    [username]
+    [mergeHistorySession]
   )
+
+  const persistSessionSnapshot = useCallback(
+    async (
+      sessionId: string,
+      sessionMessages: ChatMessage[],
+      pageContext: PageContext
+    ) => {
+      if (!sessionId || sessionMessages.length === 0) return null
+
+      upsertHistorySummary(sessionId, sessionMessages, pageContext)
+
+      try {
+        const savedSession = await upsertChatSession(sessionId, {
+          title: generateSessionTitle(sessionMessages),
+          pageContext: toAPIPageContext(pageContext),
+          messages: sessionMessages.map(toAPIMessage),
+        })
+        const mapped = toChatSession(savedSession)
+        mergeHistorySession(mapped)
+        return mapped
+      } catch (error) {
+        console.error('Failed to persist AI chat session:', error)
+        return null
+      }
+    },
+    [mergeHistorySession, upsertHistorySummary]
+  )
+
+  const reloadHistory = useCallback(async () => {
+    const response = await listChatSessions(1, MAX_HISTORY_SESSIONS)
+    const sessions = response.data.map(toChatSession)
+    setHistory(sessions)
+    return sessions
+  }, [])
+
+  const migrateLegacyHistory = useCallback(async () => {
+    const clusterName = localStorage.getItem('current-cluster') || ''
+    if (hasLegacyHistoryMigrated(clusterName)) {
+      return false
+    }
+
+    const legacySessions = loadLegacyHistoryFromStorage().filter((session) => {
+      if (!session.messages?.length) return false
+      return !session.clusterName || session.clusterName === clusterName
+    })
+
+    if (legacySessions.length === 0) {
+      markLegacyHistoryMigrated(clusterName)
+      return false
+    }
+
+    for (const session of legacySessions) {
+      await upsertChatSession(session.id, {
+        title: session.title,
+        pageContext: toAPIPageContext(
+          session.pageContext || lastPageContextRef.current
+        ),
+        messages: (session.messages || []).map(toAPIMessage),
+      })
+    }
+
+    markLegacyHistoryMigrated(clusterName)
+    return true
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+
+    const loadHistory = async () => {
+      try {
+        const sessions = await reloadHistory()
+        if (cancelled) return
+
+        if (sessions.length === 0) {
+          const migrated = await migrateLegacyHistory()
+          if (!cancelled && migrated) {
+            await reloadHistory()
+          }
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.error('Failed to load AI chat history:', error)
+        }
+      }
+    }
+
+    void loadHistory()
+    return () => {
+      cancelled = true
+    }
+  }, [currentCluster, migrateLegacyHistory, reloadHistory])
 
   const ensureSessionId = useCallback(() => {
     if (currentSessionId) return currentSessionId
     const sessionId = generateId()
     setCurrentSessionId(sessionId)
+    currentSessionIdRef.current = sessionId
     return sessionId
   }, [currentSessionId])
 
   const saveCurrentSession = useCallback(
-    (sessionId?: string | null) => {
+    (sessionId?: string | null, pageContext?: PageContext) => {
       if (messagesRef.current.length === 0) return null
 
-      const resolvedSessionId = sessionId || currentSessionId || generateId()
-      upsertSession(resolvedSessionId, messagesRef.current)
+      const resolvedSessionId =
+        sessionId ||
+        currentSessionIdRef.current ||
+        currentSessionId ||
+        generateId()
+      const resolvedPageContext = pageContext || lastPageContextRef.current
+      void persistSessionSnapshot(
+        resolvedSessionId,
+        messagesRef.current,
+        resolvedPageContext
+      )
       if (currentSessionId !== resolvedSessionId) {
         setCurrentSessionId(resolvedSessionId)
+        currentSessionIdRef.current = resolvedSessionId
       }
       return resolvedSessionId
     },
-    [currentSessionId, upsertSession]
+    [currentSessionId, persistSessionSnapshot]
   )
-
-  useEffect(() => {
-    if (!currentSessionId || messages.length === 0) return
-    upsertSession(currentSessionId, messages)
-  }, [currentSessionId, messages, upsertSession])
 
   const appendAssistantError = useCallback(
     (message: string) => {
@@ -648,11 +849,11 @@ export function useAIChat() {
     [readSSEStream]
   )
 
-  const buildAPIMessagesFromCurrentState = useCallback(
-    (extra: APIChatMessage[] = []) => {
+  const buildAPIMessages = useCallback(
+    (sourceMessages: ChatMessage[], extra: APIChatMessage[] = []) => {
       const history: APIChatMessage[] = []
 
-      for (const m of messagesRef.current) {
+      for (const m of sourceMessages) {
         if (m.role === 'user' || m.role === 'assistant') {
           history.push({ role: m.role, content: m.content })
         } else if (m.role === 'tool' && m.toolResult) {
@@ -672,12 +873,13 @@ export function useAIChat() {
       const trimmed = content.trim()
       if (!trimmed || isLoading) return
 
+      lastPageContextRef.current = pageContext
       const sessionId = ensureSessionId()
       const requestLanguage = (language || '').trim() || 'en'
-      const baseMessages = buildAPIMessagesFromCurrentState()
-
-      updateMessages((prev) => [
-        ...prev.map((message) =>
+      const previousMessages = messagesRef.current
+      const baseMessages = buildAPIMessages(previousMessages)
+      const nextMessages = [
+        ...previousMessages.map((message) =>
           message.inputRequest
             ? {
                 ...message,
@@ -689,10 +891,13 @@ export function useAIChat() {
         ),
         {
           id: generateId(),
-          role: 'user',
+          role: 'user' as const,
           content: trimmed,
         },
-      ])
+      ]
+
+      replaceMessages(nextMessages)
+      void persistSessionSnapshot(sessionId, nextMessages, pageContext)
       setIsLoading(true)
 
       const apiMessages = [
@@ -720,17 +925,18 @@ export function useAIChat() {
         abortControllerRef.current = null
         activeAssistantMsgIdRef.current = null
         startNewAssistantSegmentRef.current = false
-        saveCurrentSession(sessionId)
+        saveCurrentSession(sessionId, pageContext)
       }
     },
     [
       appendAssistantError,
-      buildAPIMessagesFromCurrentState,
+      buildAPIMessages,
       ensureSessionId,
       isLoading,
+      persistSessionSnapshot,
+      replaceMessages,
       saveCurrentSession,
       streamChat,
-      updateMessages,
     ]
   )
 
@@ -1007,6 +1213,7 @@ export function useAIChat() {
     messagesRef.current = []
     setMessages([])
     setCurrentSessionId(null)
+    currentSessionIdRef.current = null
   }, [])
 
   const stopGeneration = useCallback(() => {
@@ -1016,30 +1223,39 @@ export function useAIChat() {
   }, [])
 
   const loadSession = useCallback(
-    (sessionId: string) => {
-      const session = history.find((s) => s.id === sessionId)
-      if (!session) return
-
-      messagesRef.current = session.messages
-      setMessages(session.messages)
-      setCurrentSessionId(sessionId)
+    async (sessionId: string) => {
+      try {
+        setIsLoading(true)
+        const session = toChatSession(await getChatSession(sessionId))
+        replaceMessages(session.messages || [])
+        setCurrentSessionId(sessionId)
+        currentSessionIdRef.current = sessionId
+        if (session.pageContext) {
+          lastPageContextRef.current = session.pageContext
+        }
+        mergeHistorySession(session)
+      } catch (error) {
+        console.error('Failed to load AI chat session:', error)
+      } finally {
+        setIsLoading(false)
+      }
     },
-    [history]
+    [mergeHistorySession, replaceMessages]
   )
 
   const deleteSession = useCallback(
     (sessionId: string) => {
-      setHistory((prev) => {
-        const updated = prev.filter((s) => s.id !== sessionId)
-        saveHistoryToStorage(username, updated)
-        return updated
-      })
-
+      setHistory((prev) => prev.filter((session) => session.id !== sessionId))
       if (currentSessionId === sessionId) {
         clearMessages()
       }
+
+      void deleteChatSession(sessionId).catch((error) => {
+        console.error('Failed to delete AI chat session:', error)
+        void reloadHistory()
+      })
     },
-    [clearMessages, currentSessionId, username]
+    [clearMessages, currentSessionId, reloadHistory]
   )
 
   const newSession = useCallback(() => {

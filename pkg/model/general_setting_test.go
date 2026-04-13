@@ -83,6 +83,26 @@ func TestDefaultGeneralAIModelByProvider(t *testing.T) {
 	}
 }
 
+func TestNormalizeAIChatHistorySessionLimit(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    int
+		expected int
+	}{
+		{"default when zero", 0, DefaultAIChatHistorySessionLimit},
+		{"default when negative", -1, DefaultAIChatHistorySessionLimit},
+		{"keep positive", 300, 300},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := NormalizeAIChatHistorySessionLimit(tt.input); got != tt.expected {
+				t.Fatalf("NormalizeAIChatHistorySessionLimit() = %d, want %d", got, tt.expected)
+			}
+		})
+	}
+}
+
 func TestApplyRuntimeGeneralSetting(t *testing.T) {
 	originalAnalytics := common.EnableAnalytics
 	originalVersionCheck := common.EnableVersionCheck

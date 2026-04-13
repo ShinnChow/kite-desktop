@@ -569,7 +569,7 @@ function HistoryPanel({
 }: {
   history: ChatSession[]
   currentSessionId: string | null
-  onLoadSession: (id: string) => void
+  onLoadSession: (id: string) => void | Promise<void>
   onDeleteSession: (id: string) => void
   onNewSession: () => void
   onClose: () => void
@@ -658,7 +658,7 @@ function HistoryPanel({
                     <span>•</span>
                     <span>
                       {t('aiChat.messages', {
-                        count: session.messages.length,
+                        count: session.messageCount,
                       })}
                     </span>
                     {session.clusterName && (
