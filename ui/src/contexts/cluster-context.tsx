@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 
 import { Cluster } from '@/types/api'
+import { clusterQueryKey } from '@/lib/cluster-query'
 import { withSubPath } from '@/lib/subpath'
 
 const recentClustersStorageKey = 'recent-clusters'
@@ -59,7 +60,7 @@ export const ClusterProvider: React.FC<{ children: React.ReactNode }> = ({
     isLoading,
     error,
   } = useQuery<Cluster[]>({
-    queryKey: ['clusters'],
+    queryKey: clusterQueryKey,
     queryFn: async () => {
       const response = await fetch(withSubPath('/api/v1/clusters'), {
         credentials: 'include',

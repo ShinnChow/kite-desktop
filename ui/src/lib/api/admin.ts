@@ -9,6 +9,7 @@ import {
   Role,
   UserItem,
 } from '@/types/api'
+import { clusterManagementQueryKey } from '@/lib/cluster-query'
 
 import { apiClient } from '../api-client'
 import { fetchAPI } from './shared'
@@ -38,7 +39,7 @@ export const fetchClusterList = (): Promise<Cluster[]> => {
 
 export const useClusterList = (options?: { staleTime?: number }) => {
   return useQuery({
-    queryKey: ['cluster-list'],
+    queryKey: clusterManagementQueryKey,
     queryFn: fetchClusterList,
     staleTime: options?.staleTime || 30000, // 30 seconds cache
   })

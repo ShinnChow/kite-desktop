@@ -7,7 +7,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/eryajf/kite-desktop/pkg/common"
 	"github.com/eryajf/kite-desktop/pkg/model"
@@ -127,7 +126,7 @@ func (cm *ClusterManager) CreateCluster(c *gin.Context) {
 		return
 	}
 
-	syncNow <- struct{}{}
+	_ = requestClusterSync(true)
 
 	c.JSON(http.StatusCreated, gin.H{
 		"id":      cluster.ID,
@@ -188,7 +187,7 @@ func (cm *ClusterManager) UpdateCluster(c *gin.Context) {
 		return
 	}
 
-	syncNow <- struct{}{}
+	_ = requestClusterSync(true)
 
 	c.JSON(http.StatusOK, gin.H{"message": "cluster updated successfully"})
 }
@@ -221,7 +220,7 @@ func (cm *ClusterManager) DeleteCluster(c *gin.Context) {
 		return
 	}
 
-	syncNow <- struct{}{}
+	_ = requestClusterSync(true)
 
 	c.JSON(http.StatusOK, gin.H{"message": "cluster deleted successfully"})
 }
@@ -320,9 +319,7 @@ func (cm *ClusterManager) ImportClustersFromKubeconfig(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
-		syncNow <- struct{}{}
-		// wait for sync to complete
-		time.Sleep(1 * time.Second)
+		_ = requestClusterSync(true)
 		c.JSON(http.StatusCreated, gin.H{"message": fmt.Sprintf("imported %d clusters successfully", 1)})
 		return
 	}
@@ -334,8 +331,6 @@ func (cm *ClusterManager) ImportClustersFromKubeconfig(c *gin.Context) {
 	}
 
 	importedCount := ImportClustersFromKubeconfig(kubeconfig)
-	syncNow <- struct{}{}
-	// wait for sync to complete
-	time.Sleep(1 * time.Second)
+	_ = requestClusterSync(true)
 	c.JSON(http.StatusCreated, gin.H{"message": fmt.Sprintf("imported %d clusters successfully", importedCount)})
 }

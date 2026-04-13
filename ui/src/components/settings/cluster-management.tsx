@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
 import { Cluster } from '@/types/api'
+import { invalidateClusterQueries } from '@/lib/cluster-query'
 import {
   ClusterCreateRequest,
   ClusterConnectionTestResponse,
@@ -184,8 +185,8 @@ export function ClusterManagement() {
 
   const createMutation = useMutation({
     mutationFn: createCluster,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['cluster-list'] })
+    onSuccess: async () => {
+      await invalidateClusterQueries(queryClient)
       toast.success(
         t('clusterManagement.messages.created', 'Cluster created successfully')
       )
@@ -206,8 +207,8 @@ export function ClusterManagement() {
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: number; data: ClusterUpdateRequest }) =>
       updateCluster(id, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['cluster-list'] })
+    onSuccess: async () => {
+      await invalidateClusterQueries(queryClient)
       toast.success(
         t('clusterManagement.messages.updated', 'Cluster updated successfully')
       )
@@ -228,8 +229,8 @@ export function ClusterManagement() {
   // Delete cluster mutation
   const deleteMutation = useMutation({
     mutationFn: deleteCluster,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['cluster-list'] })
+    onSuccess: async () => {
+      await invalidateClusterQueries(queryClient)
       toast.success(
         t('clusterManagement.messages.deleted', 'Cluster deleted successfully')
       )

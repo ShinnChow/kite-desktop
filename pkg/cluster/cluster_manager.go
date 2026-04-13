@@ -229,8 +229,22 @@ func ImportClustersFromKubeconfig(kubeconfig *clientcmdapi.Config) int64 {
 }
 
 var (
-	syncNow = make(chan struct{}, 1)
+	syncNow = make(chan chan error, 1)
 )
+
+func requestClusterSync(wait bool) error {
+	var done chan error
+	if wait {
+		done = make(chan error, 1)
+	}
+
+	syncNow <- done
+	if done == nil {
+		return nil
+	}
+
+	return <-done
+}
 
 func syncClusters(cm *ClusterManager) error {
 	clusters, err := model.ListClusters()
@@ -366,9 +380,14 @@ func NewClusterManager() (*ClusterManager, error) {
 				if err := syncClusters(cm); err != nil {
 					klog.Warningf("Failed to sync clusters: %v", err)
 				}
-			case <-syncNow:
-				if err := syncClusters(cm); err != nil {
+			case done := <-syncNow:
+				err := syncClusters(cm)
+				if err != nil {
 					klog.Warningf("Failed to sync clusters: %v", err)
+				}
+				if done != nil {
+					done <- err
+					close(done)
 				}
 			}
 		}
