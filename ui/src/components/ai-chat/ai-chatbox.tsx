@@ -1245,6 +1245,10 @@ export function AIChatbox({
               placeholder="Ask about your cluster..."
               rows={1}
               value={input}
+              spellCheck={false}
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
               disabled={isLoading}

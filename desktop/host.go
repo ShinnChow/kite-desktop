@@ -31,6 +31,12 @@ var desktopTrayIcon []byte
 //go:embed build/appicon-macos.png
 var desktopMacAppIcon []byte
 
+const (
+	pageFindOpenEvent     = "kite:page-find-open"
+	pageFindNextEvent     = "kite:page-find-next"
+	pageFindPreviousEvent = "kite:page-find-previous"
+)
+
 func desktopApplicationIcon() []byte {
 	if runtime.GOOS == "darwin" && len(desktopMacAppIcon) > 0 {
 		return desktopMacAppIcon
@@ -266,6 +272,15 @@ func (h *desktopHost) saveMainWindowState(maximised bool) {
 		Height:    bounds.Height,
 		Maximised: maximised,
 	})
+}
+
+func (h *desktopHost) emitPageFindEvent(eventName string) {
+	if h == nil || h.mainWindow == nil {
+		return
+	}
+	h.mainWindow.ExecJS(
+		fmt.Sprintf("window.dispatchEvent(new Event(%s))", strconv.Quote(eventName)),
+	)
 }
 
 func (h *desktopHost) persistStateOnShutdown() {
@@ -549,7 +564,43 @@ func buildApplicationMenu(h *desktopHost, devMode bool) *application.Menu {
 		}
 	})
 
-	menu.AddRole(application.EditMenu)
+	editMenu := menu.AddSubmenu("Edit")
+	editMenu.AddRole(application.Undo)
+	editMenu.AddRole(application.Redo)
+	editMenu.AddSeparator()
+	editMenu.AddRole(application.Cut)
+	editMenu.AddRole(application.Copy)
+	editMenu.AddRole(application.Paste)
+	if runtime.GOOS == "darwin" {
+		editMenu.AddRole(application.PasteAndMatchStyle)
+		editMenu.AddRole(application.Delete)
+		editMenu.AddRole(application.SelectAll)
+		editMenu.AddSeparator()
+		editMenu.AddRole(application.SpeechMenu)
+	} else {
+		editMenu.AddRole(application.Delete)
+		editMenu.AddSeparator()
+		editMenu.AddRole(application.SelectAll)
+	}
+	editMenu.AddSeparator()
+	editMenu.Add("Find in Page").SetAccelerator("CmdOrCtrl+f").OnClick(func(ctx *application.Context) {
+		if h == nil {
+			return
+		}
+		h.emitPageFindEvent(pageFindOpenEvent)
+	})
+	editMenu.Add("Find Next").SetAccelerator("CmdOrCtrl+g").OnClick(func(ctx *application.Context) {
+		if h == nil {
+			return
+		}
+		h.emitPageFindEvent(pageFindNextEvent)
+	})
+	editMenu.Add("Find Previous").SetAccelerator("CmdOrCtrl+Shift+g").OnClick(func(ctx *application.Context) {
+		if h == nil {
+			return
+		}
+		h.emitPageFindEvent(pageFindPreviousEvent)
+	})
 
 	viewMenu := menu.AddSubmenu("View")
 	viewMenu.AddRole(application.Reload)

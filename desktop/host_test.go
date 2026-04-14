@@ -14,8 +14,14 @@ import (
 
 func TestBuildApplicationMenuIncludesEditMenu(t *testing.T) {
 	menu := buildApplicationMenu(nil, false)
-	if menu.FindByRole(application.EditMenu) == nil {
-		t.Fatal("expected application menu to include Edit menu role for standard clipboard shortcuts")
+	if menu.FindByLabel("Edit") == nil {
+		t.Fatal("expected application menu to include an Edit submenu")
+	}
+	if menu.FindByLabel("Find in Page") == nil {
+		t.Fatal("expected application menu to include Find in Page shortcut")
+	}
+	if menu.FindByRole(application.Copy) == nil {
+		t.Fatal("expected application menu to include standard clipboard shortcuts")
 	}
 }
 

@@ -11,6 +11,7 @@ import {
   GlobalSearchProvider,
   useGlobalSearch,
 } from './components/global-search-provider'
+import { PageFindProvider } from './components/page-find-provider'
 import { SiteHeader } from './components/site-header'
 import { SidebarInset, SidebarProvider } from './components/ui/sidebar'
 import { Toaster } from './components/ui/sonner'
@@ -108,7 +109,9 @@ function AppProviders({ children }: { children: ReactNode }) {
     <TerminalProvider>
       <ClusterProvider>
         <GlobalSearchProvider>
-          <AIChatProvider>{children}</AIChatProvider>
+          <PageFindProvider>
+            <AIChatProvider>{children}</AIChatProvider>
+          </PageFindProvider>
         </GlobalSearchProvider>
       </ClusterProvider>
     </TerminalProvider>

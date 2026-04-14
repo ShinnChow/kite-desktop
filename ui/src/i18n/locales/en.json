@@ -59,6 +59,12 @@
     "switchClusterMode": "Switch Cluster...",
     "switchCluster": "Switch to cluster {{name}}"
   },
+  "pageFind": {
+    "placeholder": "Find in current page...",
+    "previous": "Previous match",
+    "next": "Next match",
+    "noResults": "No results"
+  },
   "sidebar": {
     "groups": {
       "traffic": "traffic",
