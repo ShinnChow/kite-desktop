@@ -17,6 +17,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/samber/lo"
 	corev1 "k8s.io/api/core/v1"
+	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
@@ -119,7 +120,9 @@ func (h *PodHandler) ListMetrics(c *gin.Context) (map[string]metricsv1.PodMetric
 		listOpts = append(listOpts, client.MatchingLabelsSelector{Selector: labelSelectorOption})
 	}
 	if err := cs.K8sClient.List(c, &metricsList, listOpts...); err != nil {
-		klog.Warningf("Failed to list pod metrics: %v", err)
+		if !apimeta.IsNoMatchError(err) {
+			klog.Warningf("Failed to list pod metrics: %v", err)
+		}
 	}
 
 	metricsMap := lo.KeyBy(metricsList.Items, func(item metricsv1.PodMetrics) string {

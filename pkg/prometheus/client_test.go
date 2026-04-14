@@ -2,7 +2,6 @@ package prometheus
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -31,7 +30,7 @@ func (f *fakePromAPI) QueryRange(_ context.Context, query string, r v1.Range, _ 
 	if value, ok := f.queryRangeResponses[query]; ok {
 		return value, nil, nil
 	}
-	return nil, nil, fmt.Errorf("unexpected query: %s", query)
+	return model.Matrix{}, nil, nil
 }
 
 func matrixValue(ts time.Time, value float64) model.Value {
@@ -108,10 +107,10 @@ func TestGetResourceUsageHistory(t *testing.T) {
 	api := &fakePromAPI{queryRangeResponses: map[string]model.Value{}}
 	client := &Client{client: api}
 
-	cpuQuery := `sum(rate(container_cpu_usage_seconds_total{container!="POD",container!="",node="node-a"}[1m])) / sum(kube_node_status_allocatable{resource="cpu",node="node-a"}) * 100`
-	memoryQuery := `sum(container_memory_usage_bytes{container!="POD",container!="",node="node-a"}) / sum(kube_node_status_allocatable{resource="memory",node="node-a"}) * 100`
-	networkInQuery := `sum(rate(container_network_receive_bytes_total{node="node-a"}[1m]))`
-	networkOutQuery := `sum(rate(container_network_transmit_bytes_total{node="node-a"}[1m]))`
+	cpuQuery := `sum(rate(node_cpu_seconds_total{mode!="idle",node="node-a"}[5m])) / sum(rate(node_cpu_seconds_total{node="node-a"}[5m])) * 100`
+	memoryQuery := `(1 - sum(node_memory_MemAvailable_bytes{node="node-a"}) / sum(node_memory_MemTotal_bytes{node="node-a"})) * 100`
+	networkInQuery := `sum(rate(node_network_receive_bytes_total{device!="lo",node="node-a"}[1m]))`
+	networkOutQuery := `sum(rate(node_network_transmit_bytes_total{device!="lo",node="node-a"}[1m]))`
 	for _, query := range []string{cpuQuery, memoryQuery, networkInQuery, networkOutQuery} {
 		api.queryRangeResponses[query] = matrixValue(sampleTime, 1)
 	}
@@ -136,6 +135,31 @@ func TestGetResourceUsageHistory(t *testing.T) {
 	}
 }
 
+func TestGetResourceUsageHistoryFallsBackToPodMetrics(t *testing.T) {
+	sampleTime := time.Date(2026, 3, 27, 11, 30, 0, 0, time.UTC)
+	api := &fakePromAPI{queryRangeResponses: map[string]model.Value{}}
+	client := &Client{client: api}
+
+	cpuQuery := `sum(rate(container_cpu_usage_seconds_total{pod!=""}[1m])) / sum(kube_node_status_allocatable{resource="cpu"}) * 100`
+	memoryQuery := `sum(container_memory_working_set_bytes{pod!=""}) / sum(kube_node_status_allocatable{resource="memory"}) * 100`
+	api.queryRangeResponses[cpuQuery] = matrixValue(sampleTime, 2)
+	api.queryRangeResponses[memoryQuery] = matrixValue(sampleTime, 3)
+
+	got, err := client.GetResourceUsageHistory(context.Background(), "", "30m", "node")
+	if err != nil {
+		t.Fatalf("GetResourceUsageHistory() error = %v", err)
+	}
+	if len(got.CPU) != 1 || len(got.Memory) != 1 {
+		t.Fatalf("GetResourceUsageHistory() cpu/memory lengths = %#v", got)
+	}
+	if len(got.NetworkIn) != 0 || len(got.NetworkOut) != 0 {
+		t.Fatalf("GetResourceUsageHistory() network lengths = %#v, want empty", got)
+	}
+	if len(got.Warnings) == 0 {
+		t.Fatalf("GetResourceUsageHistory() warnings = %#v, want non-empty", got.Warnings)
+	}
+}
+
 func TestGetResourceUsageHistoryUnsupportedDuration(t *testing.T) {
 	client := &Client{client: &fakePromAPI{}}
 
@@ -150,12 +174,12 @@ func TestGetPodMetrics(t *testing.T) {
 	client := &Client{client: api}
 
 	queries := []string{
-		`sum(rate(container_cpu_usage_seconds_total{container!="POD",container!="",pod=~"web.*",container="api",namespace="default"}[1m]))`,
-		`sum(container_memory_usage_bytes{container!="POD",container!="",pod=~"web.*",container="api",namespace="default"}) / 1024 / 1024`,
-		`sum(rate(container_network_receive_bytes_total{pod=~"web.*",container="api",namespace="default"}[1m]))`,
-		`sum(rate(container_network_transmit_bytes_total{pod=~"web.*",container="api",namespace="default"}[1m]))`,
-		`sum(rate(container_fs_reads_bytes_total{container!="POD",container!="",pod=~"web.*",container="api",namespace="default"}[1m]))`,
-		`sum(rate(container_fs_writes_bytes_total{container!="POD",container!="",pod=~"web.*",container="api",namespace="default"}[1m]))`,
+		`sum(rate(container_cpu_usage_seconds_total{container!="POD",container!="",container="api",pod=~"web.*",namespace="default"}[1m]))`,
+		`sum(container_memory_working_set_bytes{container!="POD",container!="",container="api",pod=~"web.*",namespace="default"}) / 1024 / 1024`,
+		`sum(rate(container_network_receive_bytes_total{container!="POD",container!="",container="api",pod=~"web.*",namespace="default"}[1m]))`,
+		`sum(rate(container_network_transmit_bytes_total{container!="POD",container!="",container="api",pod=~"web.*",namespace="default"}[1m]))`,
+		`sum(rate(container_fs_reads_bytes_total{container!="POD",container!="",container="api",pod=~"web.*",namespace="default"}[1m]))`,
+		`sum(rate(container_fs_writes_bytes_total{container!="POD",container!="",container="api",pod=~"web.*",namespace="default"}[1m]))`,
 	}
 	for _, query := range queries {
 		api.queryRangeResponses[query] = matrixValue(sampleTime, 2)
@@ -168,6 +192,9 @@ func TestGetPodMetrics(t *testing.T) {
 	if got.Fallback {
 		t.Fatalf("GetPodMetrics() fallback = true, want false")
 	}
+	if got.Source != "prometheus-container" {
+		t.Fatalf("GetPodMetrics() source = %q, want prometheus-container", got.Source)
+	}
 	if len(api.queryRangeCalls) != len(queries) {
 		t.Fatalf("GetPodMetrics() query calls = %d, want %d", len(api.queryRangeCalls), len(queries))
 	}
@@ -178,6 +205,26 @@ func TestGetPodMetrics(t *testing.T) {
 		if api.queryRangeQueries[i] != query {
 			t.Fatalf("GetPodMetrics() query %d = %q, want %q", i, api.queryRangeQueries[i], query)
 		}
+	}
+}
+
+func TestGetPodMetricsFallsBackToPodAggregate(t *testing.T) {
+	sampleTime := time.Date(2026, 3, 27, 11, 0, 0, 0, time.UTC)
+	api := &fakePromAPI{queryRangeResponses: map[string]model.Value{}}
+	client := &Client{client: api}
+
+	api.queryRangeResponses[`sum(rate(container_cpu_usage_seconds_total{pod!="",pod=~"web.*",namespace="default"}[1m]))`] = matrixValue(sampleTime, 2)
+	api.queryRangeResponses[`sum(container_memory_working_set_bytes{pod!="",pod=~"web.*",namespace="default"}) / 1024 / 1024`] = matrixValue(sampleTime, 3)
+
+	got, err := client.GetPodMetrics(context.Background(), "default", "web", "api", "30m")
+	if err != nil {
+		t.Fatalf("GetPodMetrics() error = %v", err)
+	}
+	if got.Source != "prometheus-pod" {
+		t.Fatalf("GetPodMetrics() source = %q, want prometheus-pod", got.Source)
+	}
+	if len(got.Warnings) == 0 {
+		t.Fatalf("GetPodMetrics() warnings = %#v, want non-empty", got.Warnings)
 	}
 }
 

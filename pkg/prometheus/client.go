@@ -44,6 +44,7 @@ type ResourceUsageHistory struct {
 	NetworkOut []UsageDataPoint `json:"networkOut"`
 	DiskRead   []UsageDataPoint `json:"diskRead"`
 	DiskWrite  []UsageDataPoint `json:"diskWrite"`
+	Warnings   []string         `json:"warnings,omitempty"`
 }
 
 // PodMetrics contains metrics for a specific pod
@@ -55,6 +56,8 @@ type PodMetrics struct {
 	DiskRead   []UsageDataPoint `json:"diskRead"`
 	DiskWrite  []UsageDataPoint `json:"diskWrite"`
 	Fallback   bool             `json:"fallback"`
+	Source     string           `json:"source,omitempty"`
+	Warnings   []string         `json:"warnings,omitempty"`
 }
 
 type PodCurrentMetrics struct {
@@ -82,6 +85,89 @@ func NewClientWithRoundTripper(prometheusURL string, rt http.RoundTripper) (*Cli
 	}, nil
 }
 
+type seriesCandidate struct {
+	query   string
+	source  string
+	warning string
+}
+
+func joinMatchers(matchers []string) string {
+	return strings.Join(matchers, ",")
+}
+
+func appendMatcher(matchers []string, key, value string) []string {
+	if value == "" {
+		return matchers
+	}
+	return append(matchers, fmt.Sprintf(`%s="%s"`, key, value))
+}
+
+func workloadMatchers(namespace, podNamePrefix, container string, withContainerLabel bool) []string {
+	matchers := []string{}
+	if withContainerLabel {
+		matchers = append(matchers, `container!="POD"`, `container!=""`)
+		if container != "" {
+			matchers = append(matchers, fmt.Sprintf(`container="%s"`, container))
+		}
+	} else {
+		matchers = append(matchers, `pod!=""`)
+	}
+	if podNamePrefix != "" {
+		matchers = append(matchers, fmt.Sprintf(`pod=~"%s.*"`, podNamePrefix))
+	}
+	if namespace != "" {
+		matchers = append(matchers, fmt.Sprintf(`namespace="%s"`, namespace))
+	}
+	return matchers
+}
+
+func nodeScopedMatchers(nodeLabel, instance string) []string {
+	if instance == "" {
+		return nil
+	}
+	return []string{fmt.Sprintf(`%s="%s"`, nodeLabel, instance)}
+}
+
+func warningForCandidate(primary, candidate string) string {
+	if candidate == primary {
+		return ""
+	}
+	switch candidate {
+	case "node":
+		return "using node-level metrics because container-level metrics are unavailable"
+	case "pod":
+		return "using pod-level aggregate metrics because container labels are unavailable"
+	default:
+		return ""
+	}
+}
+
+func (c *Client) queryRangeFirstAvailable(ctx context.Context, start, end time.Time, step time.Duration, candidates ...seriesCandidate) ([]UsageDataPoint, string, []string, error) {
+	var errs []string
+	for _, candidate := range candidates {
+		if candidate.query == "" {
+			continue
+		}
+		data, err := c.queryRange(ctx, candidate.query, start, end, step)
+		if err != nil {
+			errs = append(errs, fmt.Sprintf("%s: %v", candidate.source, err))
+			continue
+		}
+		if len(data) == 0 {
+			continue
+		}
+		var warnings []string
+		if candidate.warning != "" {
+			warnings = append(warnings, candidate.warning)
+		}
+		return data, candidate.source, warnings, nil
+	}
+	if len(errs) > 0 {
+		return nil, "", nil, fmt.Errorf("%s", strings.Join(errs, "; "))
+	}
+	return nil, "", nil, nil
+}
+
 // GetResourceUsageHistory fetches historical usage data for CPU and Memory
 func (c *Client) GetResourceUsageHistory(ctx context.Context, instance string, duration string, nodeLabel string) (*ResourceUsageHistory, error) {
 	var step time.Duration
@@ -104,57 +190,102 @@ func (c *Client) GetResourceUsageHistory(ctx context.Context, instance string, d
 	now := time.Now()
 	start := now.Add(-timeRange)
 
-	conditions := []string{
-		`container!="POD"`, // Exclude the "POD" container
-		`container!=""`,    // Exclude empty containers
-	}
-	cpuConditions := []string{
-		`resource="cpu"`,
-	}
-	memoryConditions := []string{
-		`resource="memory"`,
-	}
-	if instance != "" {
-		conditions = append(conditions, fmt.Sprintf(`%s="%s"`, nodeLabel, instance))
-		cpuConditions = append(cpuConditions, fmt.Sprintf(`node="%s"`, instance))
-		memoryConditions = append(memoryConditions, fmt.Sprintf(`node="%s"`, instance))
-	}
+	var warnings []string
 
-	// Query CPU usage percentage - using container CPU usage
-	cpuQuery := fmt.Sprintf(`sum(rate(container_cpu_usage_seconds_total{%s}[1m])) / sum(kube_node_status_allocatable{%s}) * 100`, strings.Join(conditions, ","), strings.Join(cpuConditions, ","))
-	cpuData, err := c.queryRange(ctx, cpuQuery, start, now, step)
+	nodeMatchers := nodeScopedMatchers(nodeLabel, instance)
+	cpuAllocatableMatchers := append([]string{`resource="cpu"`}, nodeMatchers...)
+	memoryAllocatableMatchers := append([]string{`resource="memory"`}, nodeMatchers...)
+
+	cpuData, _, cpuWarnings, err := c.queryRangeFirstAvailable(ctx, start, now, step,
+		seriesCandidate{
+			query:   fmt.Sprintf(`sum(rate(node_cpu_seconds_total{%s}[5m])) / sum(rate(node_cpu_seconds_total{%s}[5m])) * 100`, joinMatchers(append([]string{`mode!="idle"`}, nodeMatchers...)), joinMatchers(nodeMatchers)),
+			source:  "node",
+			warning: warningForCandidate("node", "node"),
+		},
+		seriesCandidate{
+			query:   fmt.Sprintf(`sum(rate(container_cpu_usage_seconds_total{%s}[1m])) / sum(kube_node_status_allocatable{%s}) * 100`, joinMatchers(append(workloadMatchers("", "", "", true), nodeMatchers...)), joinMatchers(cpuAllocatableMatchers)),
+			source:  "container",
+			warning: warningForCandidate("node", "container"),
+		},
+		seriesCandidate{
+			query:   fmt.Sprintf(`sum(rate(container_cpu_usage_seconds_total{%s}[1m])) / sum(kube_node_status_allocatable{%s}) * 100`, joinMatchers(append(workloadMatchers("", "", "", false), nodeMatchers...)), joinMatchers(cpuAllocatableMatchers)),
+			source:  "pod",
+			warning: warningForCandidate("node", "pod"),
+		},
+	)
 	if err != nil {
 		return nil, fmt.Errorf("error querying CPU usage: %w", err)
 	}
+	warnings = append(warnings, cpuWarnings...)
 
-	// Query Memory usage percentage - using container memory usage
-	memoryQuery := fmt.Sprintf(`sum(container_memory_usage_bytes{%s}) / sum(kube_node_status_allocatable{%s}) * 100`, strings.Join(conditions, ","), strings.Join(memoryConditions, ","))
-	memoryData, err := c.queryRange(ctx, memoryQuery, start, now, step)
+	memoryData, _, memoryWarnings, err := c.queryRangeFirstAvailable(ctx, start, now, step,
+		seriesCandidate{
+			query:   fmt.Sprintf(`(1 - sum(node_memory_MemAvailable_bytes{%s}) / sum(node_memory_MemTotal_bytes{%s})) * 100`, joinMatchers(nodeMatchers), joinMatchers(nodeMatchers)),
+			source:  "node",
+			warning: warningForCandidate("node", "node"),
+		},
+		seriesCandidate{
+			query:   fmt.Sprintf(`sum(container_memory_working_set_bytes{%s}) / sum(kube_node_status_allocatable{%s}) * 100`, joinMatchers(append(workloadMatchers("", "", "", true), nodeMatchers...)), joinMatchers(memoryAllocatableMatchers)),
+			source:  "container",
+			warning: warningForCandidate("node", "container"),
+		},
+		seriesCandidate{
+			query:   fmt.Sprintf(`sum(container_memory_working_set_bytes{%s}) / sum(kube_node_status_allocatable{%s}) * 100`, joinMatchers(append(workloadMatchers("", "", "", false), nodeMatchers...)), joinMatchers(memoryAllocatableMatchers)),
+			source:  "pod",
+			warning: warningForCandidate("node", "pod"),
+		},
+		seriesCandidate{
+			query:   fmt.Sprintf(`sum(container_memory_usage_bytes{%s}) / sum(kube_node_status_allocatable{%s}) * 100`, joinMatchers(append(workloadMatchers("", "", "", true), nodeMatchers...)), joinMatchers(memoryAllocatableMatchers)),
+			source:  "container",
+			warning: warningForCandidate("node", "container"),
+		},
+		seriesCandidate{
+			query:   fmt.Sprintf(`sum(container_memory_usage_bytes{%s}) / sum(kube_node_status_allocatable{%s}) * 100`, joinMatchers(append(workloadMatchers("", "", "", false), nodeMatchers...)), joinMatchers(memoryAllocatableMatchers)),
+			source:  "pod",
+			warning: warningForCandidate("node", "pod"),
+		},
+	)
 	if err != nil {
 		return nil, fmt.Errorf("error querying Memory usage: %w", err)
 	}
+	warnings = append(warnings, memoryWarnings...)
 
-	conditions = []string{}
-	if instance != "" {
-		conditions = append(conditions, fmt.Sprintf(`%s="%s"`, nodeLabel, instance))
-	}
-
-	// Query Network incoming bytes rate (bytes per second)
-	networkInQuery := fmt.Sprintf(`sum(rate(container_network_receive_bytes_total{%s}[1m]))`, strings.Join(conditions, ","))
-	networkInData, err := c.queryRange(ctx, networkInQuery, start, now, step)
+	networkInData, _, networkInWarnings, err := c.queryRangeFirstAvailable(ctx, start, now, step,
+		seriesCandidate{
+			query:   fmt.Sprintf(`sum(rate(node_network_receive_bytes_total{%s}[1m]))`, joinMatchers(append([]string{`device!="lo"`}, nodeMatchers...))),
+			source:  "node",
+			warning: warningForCandidate("node", "node"),
+		},
+		seriesCandidate{
+			query:   fmt.Sprintf(`sum(rate(container_network_receive_bytes_total{%s}[1m]))`, joinMatchers(nodeMatchers)),
+			source:  "container",
+			warning: warningForCandidate("node", "container"),
+		},
+	)
 	if err != nil {
 		return nil, fmt.Errorf("error querying Network incoming bytes: %w", err)
 	}
+	warnings = append(warnings, networkInWarnings...)
 
-	// Query Network outgoing bytes rate (bytes per second)
-	networkOutQuery := fmt.Sprintf(`sum(rate(container_network_transmit_bytes_total{%s}[1m]))`, strings.Join(conditions, ","))
-	networkOutData, err := c.queryRange(ctx, networkOutQuery, start, now, step)
+	networkOutData, _, networkOutWarnings, err := c.queryRangeFirstAvailable(ctx, start, now, step,
+		seriesCandidate{
+			query:   fmt.Sprintf(`sum(rate(node_network_transmit_bytes_total{%s}[1m]))`, joinMatchers(append([]string{`device!="lo"`}, nodeMatchers...))),
+			source:  "node",
+			warning: warningForCandidate("node", "node"),
+		},
+		seriesCandidate{
+			query:   fmt.Sprintf(`sum(rate(container_network_transmit_bytes_total{%s}[1m]))`, joinMatchers(nodeMatchers)),
+			source:  "container",
+			warning: warningForCandidate("node", "container"),
+		},
+	)
 	if err != nil {
 		return nil, fmt.Errorf("error querying Network outgoing bytes: %w", err)
 	}
+	warnings = append(warnings, networkOutWarnings...)
 
-	if len(cpuData) == 0 && len(memoryData) == 0 && len(networkInData) == 0 && len(networkOutData) == 0 {
-		return nil, fmt.Errorf("metrics-server or kube-state-metrics may not be available or configured correctly")
+	if len(cpuData) == 0 && len(memoryData) == 0 {
+		return nil, fmt.Errorf("resource usage history is unavailable from Prometheus")
 	}
 
 	return &ResourceUsageHistory{
@@ -162,6 +293,7 @@ func (c *Client) GetResourceUsageHistory(ctx context.Context, instance string, d
 		Memory:     memoryData,
 		NetworkIn:  networkInData,
 		NetworkOut: networkOutData,
+		Warnings:   warnings,
 	}, nil
 }
 
@@ -217,126 +349,116 @@ func (c *Client) QueryRange(ctx context.Context, query string, r v1.Range, opts 
 	return c.client.QueryRange(ctx, query, r, opts...)
 }
 
-func (c *Client) GetCPUUsage(ctx context.Context, namespace, podNamePrefix, container string, timeRange, step time.Duration) ([]UsageDataPoint, error) {
+func (c *Client) getCPUUsage(ctx context.Context, namespace, podNamePrefix, container string, timeRange, step time.Duration) ([]UsageDataPoint, string, []string, error) {
 	now := time.Now()
 	start := now.Add(-timeRange)
-
-	// Build query conditionally based on whether pod name prefix and container are provided
-	conditions := []string{
-		`container!="POD"`, // Exclude the "POD" container
-		`container!=""`,    // Exclude empty containers
-	}
-	if podNamePrefix != "" {
-		conditions = append(conditions, fmt.Sprintf(`pod=~"%s.*"`, podNamePrefix))
-	}
-	if container != "" {
-		conditions = append(conditions, fmt.Sprintf(`container="%s"`, container))
-	}
-	if namespace != "" {
-		conditions = append(conditions, fmt.Sprintf(`namespace="%s"`, namespace))
-	}
-	query := fmt.Sprintf(`sum(rate(container_cpu_usage_seconds_total{%s}[1m]))`, strings.Join(conditions, ","))
-	return c.queryRange(ctx, query, start, now, step)
+	return c.queryRangeFirstAvailable(ctx, start, now, step,
+		seriesCandidate{
+			query:   fmt.Sprintf(`sum(rate(container_cpu_usage_seconds_total{%s}[1m]))`, joinMatchers(workloadMatchers(namespace, podNamePrefix, container, true))),
+			source:  "prometheus-container",
+			warning: "",
+		},
+		seriesCandidate{
+			query:   fmt.Sprintf(`sum(rate(container_cpu_usage_seconds_total{%s}[1m]))`, joinMatchers(workloadMatchers(namespace, podNamePrefix, "", false))),
+			source:  "prometheus-pod",
+			warning: warningForCandidate("prometheus-container", "pod"),
+		},
+	)
 }
 
-func (c *Client) GetMemoryUsage(ctx context.Context, namespace, podNamePrefix, container string, timeRange, step time.Duration) ([]UsageDataPoint, error) {
+func (c *Client) getMemoryUsage(ctx context.Context, namespace, podNamePrefix, container string, timeRange, step time.Duration) ([]UsageDataPoint, string, []string, error) {
 	now := time.Now()
 	start := now.Add(-timeRange)
-
-	// Build query conditionally based on whether pod name prefix and container are provided
-	conditions := []string{
-		`container!="POD"`, // Exclude the "POD" container
-		`container!=""`,    // Exclude empty containers
-	}
-	if podNamePrefix != "" {
-		conditions = append(conditions, fmt.Sprintf(`pod=~"%s.*"`, podNamePrefix))
-	}
-	if container != "" {
-		conditions = append(conditions, fmt.Sprintf(`container="%s"`, container))
-	}
-	if namespace != "" {
-		conditions = append(conditions, fmt.Sprintf(`namespace="%s"`, namespace))
-	}
-	query := fmt.Sprintf(`sum(container_memory_usage_bytes{%s}) / 1024 / 1024`, strings.Join(conditions, ","))
-	return c.queryRange(ctx, query, start, now, step)
+	return c.queryRangeFirstAvailable(ctx, start, now, step,
+		seriesCandidate{
+			query:   fmt.Sprintf(`sum(container_memory_working_set_bytes{%s}) / 1024 / 1024`, joinMatchers(workloadMatchers(namespace, podNamePrefix, container, true))),
+			source:  "prometheus-container",
+			warning: "",
+		},
+		seriesCandidate{
+			query:   fmt.Sprintf(`sum(container_memory_working_set_bytes{%s}) / 1024 / 1024`, joinMatchers(workloadMatchers(namespace, podNamePrefix, "", false))),
+			source:  "prometheus-pod",
+			warning: warningForCandidate("prometheus-container", "pod"),
+		},
+		seriesCandidate{
+			query:   fmt.Sprintf(`sum(container_memory_usage_bytes{%s}) / 1024 / 1024`, joinMatchers(workloadMatchers(namespace, podNamePrefix, container, true))),
+			source:  "prometheus-container",
+			warning: "",
+		},
+		seriesCandidate{
+			query:   fmt.Sprintf(`sum(container_memory_usage_bytes{%s}) / 1024 / 1024`, joinMatchers(workloadMatchers(namespace, podNamePrefix, "", false))),
+			source:  "prometheus-pod",
+			warning: warningForCandidate("prometheus-container", "pod"),
+		},
+	)
 }
 
-func (c *Client) GetNetworkInUsage(ctx context.Context, namespace, podNamePrefix, container string, timeRange, step time.Duration) ([]UsageDataPoint, error) {
+func (c *Client) getNetworkInUsage(ctx context.Context, namespace, podNamePrefix, container string, timeRange, step time.Duration) ([]UsageDataPoint, string, []string, error) {
 	now := time.Now()
 	start := now.Add(-timeRange)
-
-	conditions := []string{}
-	if podNamePrefix != "" {
-		conditions = append(conditions, fmt.Sprintf(`pod=~"%s.*"`, podNamePrefix))
-	}
-	if container != "" {
-		conditions = append(conditions, fmt.Sprintf(`container="%s"`, container))
-	}
-	if namespace != "" {
-		conditions = append(conditions, fmt.Sprintf(`namespace="%s"`, namespace))
-	}
-	query := fmt.Sprintf(`sum(rate(container_network_receive_bytes_total{%s}[1m]))`, strings.Join(conditions, ","))
-	return c.queryRange(ctx, query, start, now, step)
+	return c.queryRangeFirstAvailable(ctx, start, now, step,
+		seriesCandidate{
+			query:   fmt.Sprintf(`sum(rate(container_network_receive_bytes_total{%s}[1m]))`, joinMatchers(workloadMatchers(namespace, podNamePrefix, container, true))),
+			source:  "prometheus-container",
+			warning: "",
+		},
+		seriesCandidate{
+			query:   fmt.Sprintf(`sum(rate(container_network_receive_bytes_total{%s}[1m]))`, joinMatchers(workloadMatchers(namespace, podNamePrefix, "", false))),
+			source:  "prometheus-pod",
+			warning: warningForCandidate("prometheus-container", "pod"),
+		},
+	)
 }
 
-func (c *Client) GetNetworkOutUsage(ctx context.Context, namespace, podNamePrefix, container string, timeRange, step time.Duration) ([]UsageDataPoint, error) {
+func (c *Client) getNetworkOutUsage(ctx context.Context, namespace, podNamePrefix, container string, timeRange, step time.Duration) ([]UsageDataPoint, string, []string, error) {
 	now := time.Now()
 	start := now.Add(-timeRange)
-
-	conditions := []string{}
-	if podNamePrefix != "" {
-		conditions = append(conditions, fmt.Sprintf(`pod=~"%s.*"`, podNamePrefix))
-	}
-	if container != "" {
-		conditions = append(conditions, fmt.Sprintf(`container="%s"`, container))
-	}
-	if namespace != "" {
-		conditions = append(conditions, fmt.Sprintf(`namespace="%s"`, namespace))
-	}
-	query := fmt.Sprintf(`sum(rate(container_network_transmit_bytes_total{%s}[1m]))`, strings.Join(conditions, ","))
-	return c.queryRange(ctx, query, start, now, step)
+	return c.queryRangeFirstAvailable(ctx, start, now, step,
+		seriesCandidate{
+			query:   fmt.Sprintf(`sum(rate(container_network_transmit_bytes_total{%s}[1m]))`, joinMatchers(workloadMatchers(namespace, podNamePrefix, container, true))),
+			source:  "prometheus-container",
+			warning: "",
+		},
+		seriesCandidate{
+			query:   fmt.Sprintf(`sum(rate(container_network_transmit_bytes_total{%s}[1m]))`, joinMatchers(workloadMatchers(namespace, podNamePrefix, "", false))),
+			source:  "prometheus-pod",
+			warning: warningForCandidate("prometheus-container", "pod"),
+		},
+	)
 }
 
-func (c *Client) GetDiskReadUsage(ctx context.Context, namespace, podNamePrefix, container string, timeRange, step time.Duration) ([]UsageDataPoint, error) {
+func (c *Client) getDiskReadUsage(ctx context.Context, namespace, podNamePrefix, container string, timeRange, step time.Duration) ([]UsageDataPoint, string, []string, error) {
 	now := time.Now()
 	start := now.Add(-timeRange)
-
-	conditions := []string{
-		`container!="POD"`, // Exclude the "POD" container
-		`container!=""`,    // Exclude empty containers
-	}
-	if podNamePrefix != "" {
-		conditions = append(conditions, fmt.Sprintf(`pod=~"%s.*"`, podNamePrefix))
-	}
-	if container != "" {
-		conditions = append(conditions, fmt.Sprintf(`container="%s"`, container))
-	}
-	if namespace != "" {
-		conditions = append(conditions, fmt.Sprintf(`namespace="%s"`, namespace))
-	}
-	query := fmt.Sprintf(`sum(rate(container_fs_reads_bytes_total{%s}[1m]))`, strings.Join(conditions, ","))
-	return c.queryRange(ctx, query, start, now, step)
+	return c.queryRangeFirstAvailable(ctx, start, now, step,
+		seriesCandidate{
+			query:   fmt.Sprintf(`sum(rate(container_fs_reads_bytes_total{%s}[1m]))`, joinMatchers(workloadMatchers(namespace, podNamePrefix, container, true))),
+			source:  "prometheus-container",
+			warning: "",
+		},
+		seriesCandidate{
+			query:   fmt.Sprintf(`sum(rate(container_fs_reads_bytes_total{%s}[1m]))`, joinMatchers(workloadMatchers(namespace, podNamePrefix, "", false))),
+			source:  "prometheus-pod",
+			warning: warningForCandidate("prometheus-container", "pod"),
+		},
+	)
 }
 
-func (c *Client) GetDiskWriteUsage(ctx context.Context, namespace, podNamePrefix, container string, timeRange, step time.Duration) ([]UsageDataPoint, error) {
+func (c *Client) getDiskWriteUsage(ctx context.Context, namespace, podNamePrefix, container string, timeRange, step time.Duration) ([]UsageDataPoint, string, []string, error) {
 	now := time.Now()
 	start := now.Add(-timeRange)
-
-	conditions := []string{
-		`container!="POD"`, // Exclude the "POD" container
-		`container!=""`,    // Exclude empty containers
-	}
-	if podNamePrefix != "" {
-		conditions = append(conditions, fmt.Sprintf(`pod=~"%s.*"`, podNamePrefix))
-	}
-	if container != "" {
-		conditions = append(conditions, fmt.Sprintf(`container="%s"`, container))
-	}
-	if namespace != "" {
-		conditions = append(conditions, fmt.Sprintf(`namespace="%s"`, namespace))
-	}
-	query := fmt.Sprintf(`sum(rate(container_fs_writes_bytes_total{%s}[1m]))`, strings.Join(conditions, ","))
-	return c.queryRange(ctx, query, start, now, step)
+	return c.queryRangeFirstAvailable(ctx, start, now, step,
+		seriesCandidate{
+			query:   fmt.Sprintf(`sum(rate(container_fs_writes_bytes_total{%s}[1m]))`, joinMatchers(workloadMatchers(namespace, podNamePrefix, container, true))),
+			source:  "prometheus-container",
+			warning: "",
+		},
+		seriesCandidate{
+			query:   fmt.Sprintf(`sum(rate(container_fs_writes_bytes_total{%s}[1m]))`, joinMatchers(workloadMatchers(namespace, podNamePrefix, "", false))),
+			source:  "prometheus-pod",
+			warning: warningForCandidate("prometheus-container", "pod"),
+		},
+	)
 }
 
 func FillMissingDataPoints(timeRange time.Duration, step time.Duration, existing []UsageDataPoint) []UsageDataPoint {
@@ -381,34 +503,50 @@ func (c *Client) GetPodMetrics(ctx context.Context, namespace, podName, containe
 		return nil, fmt.Errorf("unsupported duration: %s", duration)
 	}
 
-	cpuData, err := c.GetCPUUsage(ctx, namespace, podName, container, timeRange, step)
+	var warnings []string
+	cpuData, cpuSource, cpuWarnings, err := c.getCPUUsage(ctx, namespace, podName, container, timeRange, step)
 	if err != nil {
 		return nil, fmt.Errorf("error querying pod CPU usage: %w", err)
 	}
-	// Memory usage query for specific pod
-	memoryData, err := c.GetMemoryUsage(ctx, namespace, podName, container, timeRange, step)
+	warnings = append(warnings, cpuWarnings...)
+
+	memoryData, memorySource, memoryWarnings, err := c.getMemoryUsage(ctx, namespace, podName, container, timeRange, step)
 	if err != nil {
 		return nil, fmt.Errorf("error querying pod Memory usage: %w", err)
 	}
+	warnings = append(warnings, memoryWarnings...)
 
-	networkInData, err := c.GetNetworkInUsage(ctx, namespace, podName, container, timeRange, step)
+	networkInData, _, networkInWarnings, err := c.getNetworkInUsage(ctx, namespace, podName, container, timeRange, step)
 	if err != nil {
 		return nil, fmt.Errorf("error querying pod Network incoming usage: %w", err)
 	}
+	warnings = append(warnings, networkInWarnings...)
 
-	networkOutData, err := c.GetNetworkOutUsage(ctx, namespace, podName, container, timeRange, step)
+	networkOutData, _, networkOutWarnings, err := c.getNetworkOutUsage(ctx, namespace, podName, container, timeRange, step)
 	if err != nil {
 		return nil, fmt.Errorf("error querying pod Network outgoing usage: %w", err)
 	}
+	warnings = append(warnings, networkOutWarnings...)
 
-	diskReadData, err := c.GetDiskReadUsage(ctx, namespace, podName, container, timeRange, step)
+	diskReadData, _, diskReadWarnings, err := c.getDiskReadUsage(ctx, namespace, podName, container, timeRange, step)
 	if err != nil {
 		return nil, fmt.Errorf("error querying pod Disk read usage: %w", err)
 	}
+	warnings = append(warnings, diskReadWarnings...)
 
-	diskWriteData, err := c.GetDiskWriteUsage(ctx, namespace, podName, container, timeRange, step)
+	diskWriteData, _, diskWriteWarnings, err := c.getDiskWriteUsage(ctx, namespace, podName, container, timeRange, step)
 	if err != nil {
 		return nil, fmt.Errorf("error querying pod Disk write usage: %w", err)
+	}
+	warnings = append(warnings, diskWriteWarnings...)
+
+	if len(cpuData) == 0 && len(memoryData) == 0 {
+		return nil, fmt.Errorf("pod metrics are unavailable from Prometheus")
+	}
+
+	source := cpuSource
+	if source == "" {
+		source = memorySource
 	}
 
 	return &PodMetrics{
@@ -419,5 +557,7 @@ func (c *Client) GetPodMetrics(ctx context.Context, namespace, podName, containe
 		DiskRead:   FillMissingDataPoints(timeRange, step, diskReadData),
 		DiskWrite:  FillMissingDataPoints(timeRange, step, diskWriteData),
 		Fallback:   false,
+		Source:     source,
+		Warnings:   warnings,
 	}, nil
 }
