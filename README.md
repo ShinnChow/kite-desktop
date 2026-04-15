@@ -111,4 +111,9 @@ make build
 
 ## 许可证
 
-本仓库继续沿用项目现有许可证，详见 [LICENSE](./LICENSE)。
+从当前主线代码开始，本仓库改为使用 `AGPL-3.0-only`，详见 [LICENSE](./LICENSE)。
+
+同时说明两个边界：
+
+- 已经发布的 `v0.1.0` 到 `v0.1.6` 版本，继续按当时发布时的 `Apache-2.0` 生效
+- 当前仓库基于上游 `Kite` 深度改造而来，仓库内仍可能包含继承自上游的 `Apache-2.0` 代码与署名义务，相关说明见 [NOTICE](./NOTICE) 与 [licenses/Apache-2.0.txt](./licenses/Apache-2.0.txt)

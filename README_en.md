@@ -116,4 +116,14 @@ To be explicit:
 
 ## License
 
-This repository continues to follow the existing project license. See [LICENSE](./LICENSE).
+Starting from the current mainline code, this repository is distributed
+under `AGPL-3.0-only`. See [LICENSE](./LICENSE).
+
+Two boundaries are worth making explicit:
+
+- released versions `v0.1.0` through `v0.1.6` remain available under the
+  original `Apache-2.0` terms they were published with
+- this repository is a deep desktop-focused derivative of upstream
+  `Kite`, so it may still contain inherited `Apache-2.0` code and
+  attribution obligations; see [NOTICE](./NOTICE) and
+  [licenses/Apache-2.0.txt](./licenses/Apache-2.0.txt)

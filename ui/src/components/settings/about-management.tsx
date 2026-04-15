@@ -583,7 +583,7 @@ export function AboutManagement() {
             {t('aboutManagement.fields.runtime', 'Runtime')}: {runtime}
           </span>
           <span>
-            {t('aboutManagement.fields.license', 'License')}: Apache License 2.0
+            {t('aboutManagement.fields.license', 'License')}: AGPL-3.0-only
           </span>
         </div>
       </CardContent>
