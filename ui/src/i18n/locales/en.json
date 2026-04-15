@@ -1059,6 +1059,60 @@
     "history": "Chat history",
     "openInNewTab": "Open in new tab",
     "close": "Close",
+    "windowTitle": "Kite AI Chat",
+    "composer": {
+      "placeholder": "Ask about your cluster..."
+    },
+    "message": {
+      "thinking": "Thinking"
+    },
+    "historyRelative": {
+      "justNow": "Just now",
+      "minutesAgo": "{{count}}m ago",
+      "hoursAgo": "{{count}}h ago",
+      "daysAgo": "{{count}}d ago"
+    },
+    "tool": {
+      "yaml": "YAML",
+      "selectOption": "Select an option",
+      "continue": "Continue"
+    },
+    "action": {
+      "confirm": "Confirm",
+      "cancel": "Cancel",
+      "delete": "Delete {{target}}",
+      "scale": "Scale {{target}} to {{replicas}} replicas",
+      "restart": "Restart {{target}}",
+      "patch": "Patch {{target}}",
+      "patchPreview": "Patch {{target}}: {{patch}}",
+      "createNamed": "Create {{kind}} {{name}}",
+      "createResource": "Create resource",
+      "updateNamed": "Update {{kind}} {{name}}",
+      "updateResource": "Update resource"
+    },
+    "toolStatus": {
+      "calling": "Calling {{tool}}...",
+      "completed": "{{tool}} completed",
+      "failed": "{{tool}} failed",
+      "requiresConfirmation": "{{tool}} requires confirmation",
+      "requiresInput": "{{tool}} requires input",
+      "executing": "{{tool}} executing",
+      "submitting": "{{tool}} submitting",
+      "cancelled": "{{tool}} cancelled",
+      "genericRequest": "request",
+      "genericInputRequest": "input request"
+    },
+    "validation": {
+      "required": "Required"
+    },
+    "error": {
+      "message": "Error: {{message}}",
+      "missingPendingActionSession": "Missing session id for pending action {{tool}}",
+      "missingInputRequestSession": "Missing session id for input request {{tool}}",
+      "unsupportedInputRequestType": "Unsupported input request type {{kind}}",
+      "pendingActionExpired": "This pending action has expired. Please ask the AI to generate the action again.",
+      "inputRequestExpired": "This input request has expired. Please ask the AI again."
+    },
     "suggestedPrompts": {
       "hint": "Start with a focused check",
       "fallback": {

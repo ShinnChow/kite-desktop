@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import {
   AIChatMessagePayload,
@@ -122,9 +123,12 @@ function markLegacyHistoryMigrated(clusterName: string) {
 }
 
 // TODO: generate session title with AI to better summarize the conversation, instead of just using the first user message
-function generateSessionTitle(messages: ChatMessage[]): string {
+function generateSessionTitle(
+  messages: ChatMessage[],
+  fallbackTitle: string
+): string {
   const firstUserMessage = messages.find((m) => m.role === 'user')
-  if (!firstUserMessage) return 'New Chat'
+  if (!firstUserMessage) return fallbackTitle
   const content = firstUserMessage.content.trim()
   return content.length > 50 ? content.slice(0, 50) + '...' : content
 }
@@ -203,6 +207,7 @@ function toAPIMessage(message: ChatMessage): AIChatMessagePayload {
 }
 
 export function useAIChat() {
+  const { t } = useTranslation()
   const currentCluster = localStorage.getItem('current-cluster') || ''
 
   const [messages, setMessages] = useState<ChatMessage[]>([])
@@ -279,7 +284,10 @@ export function useAIChat() {
       const now = Date.now()
       mergeHistorySession({
         id: sessionId,
-        title: generateSessionTitle(sessionMessages),
+        title: generateSessionTitle(
+          sessionMessages,
+          t('aiChat.newChat', { defaultValue: 'New Chat' })
+        ),
         createdAt: createdAt || now,
         updatedAt: now,
         clusterName: localStorage.getItem('current-cluster') || '',
@@ -287,7 +295,7 @@ export function useAIChat() {
         pageContext,
       })
     },
-    [mergeHistorySession]
+    [mergeHistorySession, t]
   )
 
   const persistSessionSnapshot = useCallback(
@@ -302,7 +310,10 @@ export function useAIChat() {
 
       try {
         const savedSession = await upsertChatSession(sessionId, {
-          title: generateSessionTitle(sessionMessages),
+          title: generateSessionTitle(
+            sessionMessages,
+            t('aiChat.newChat', { defaultValue: 'New Chat' })
+          ),
           pageContext: toAPIPageContext(pageContext),
           messages: sessionMessages.map(toAPIMessage),
         })
@@ -314,7 +325,7 @@ export function useAIChat() {
         return null
       }
     },
-    [mergeHistorySession, upsertHistorySummary]
+    [mergeHistorySession, t, upsertHistorySummary]
   )
 
   const reloadHistory = useCallback(async () => {
@@ -422,11 +433,41 @@ export function useAIChat() {
         {
           id: generateId(),
           role: 'assistant',
-          content: `Error: ${message}`,
+          content: t('aiChat.error.message', {
+            defaultValue: 'Error: {{message}}',
+            message,
+          }),
         },
       ])
     },
-    [updateMessages]
+    [t, updateMessages]
+  )
+
+  const getToolStatusContent = useCallback(
+    (
+      key:
+        | 'calling'
+        | 'completed'
+        | 'failed'
+        | 'requiresConfirmation'
+        | 'executing'
+        | 'submitting'
+        | 'cancelled',
+      toolName: string
+    ) =>
+      t(`aiChat.toolStatus.${key}`, {
+        defaultValue: {
+          calling: 'Calling {{tool}}...',
+          completed: '{{tool}} completed',
+          failed: '{{tool}} failed',
+          requiresConfirmation: '{{tool}} requires confirmation',
+          executing: '{{tool}} executing',
+          submitting: '{{tool}} submitting',
+          cancelled: '{{tool}} cancelled',
+        }[key],
+        tool: toolName,
+      }),
+    [t]
   )
 
   const updateToolMessage = useCallback(
@@ -551,7 +592,7 @@ export function useAIChat() {
             {
               id: generateId(),
               role: 'tool' as const,
-              content: `Calling ${tool}...`,
+              content: getToolStatusContent('calling', tool),
               toolCallId:
                 typeof tool_call_id === 'string' ? tool_call_id : undefined,
               toolName: tool,
@@ -575,7 +616,10 @@ export function useAIChat() {
               : /^(error:|forbidden:|tool error:)/i.test(toolResult.trim())
           updateToolMessage(tool_call_id, tool, (message) => ({
             ...message,
-            content: `${tool} ${inferredError ? 'failed' : 'completed'}`,
+            content: getToolStatusContent(
+              inferredError ? 'failed' : 'completed',
+              tool
+            ),
             toolResult,
             actionStatus: inferredError ? 'error' : 'confirmed',
           }))
@@ -590,13 +634,16 @@ export function useAIChat() {
           }
           if (!session_id) {
             appendAssistantError(
-              `Missing session id for pending action ${tool}`
+              t('aiChat.error.missingPendingActionSession', {
+                defaultValue: 'Missing session id for pending action {{tool}}',
+                tool,
+              })
             )
             break
           }
           updateToolMessage(tool_call_id, tool, (message) => ({
             ...message,
-            content: `${tool} requires confirmation`,
+            content: getToolStatusContent('requiresConfirmation', tool),
             pendingAction: { tool, args, sessionId: session_id },
             actionStatus: 'pending' as const,
           }))
@@ -644,17 +691,30 @@ export function useAIChat() {
             }>
           }
           if (!session_id) {
-            appendAssistantError(`Missing session id for input request ${tool}`)
+            appendAssistantError(
+              t('aiChat.error.missingInputRequestSession', {
+                defaultValue: 'Missing session id for input request {{tool}}',
+                tool,
+              })
+            )
             break
           }
           if (kind !== 'choice' && kind !== 'form') {
-            appendAssistantError(`Unsupported input request type ${kind}`)
+            appendAssistantError(
+              t('aiChat.error.unsupportedInputRequestType', {
+                defaultValue: 'Unsupported input request type {{kind}}',
+                kind,
+              })
+            )
             break
           }
 
           updateToolMessage(tool_call_id, tool, (message) => ({
             ...message,
-            content: `${tool} requires input`,
+            content: t('aiChat.toolStatus.requiresInput', {
+              defaultValue: '{{tool}} requires input',
+              tool,
+            }),
             inputRequest: {
               sessionId: session_id,
               kind,
@@ -746,7 +806,7 @@ export function useAIChat() {
         }
       }
     },
-    [appendAssistantError, updateMessages, updateToolMessage]
+    [appendAssistantError, getToolStatusContent, t, updateMessages, updateToolMessage]
   )
 
   const readSSEStream = useCallback(
@@ -906,7 +966,13 @@ export function useAIChat() {
                 ...message,
                 actionStatus: 'denied' as const,
                 inputRequest: undefined,
-                content: `${message.toolName || 'input request'} cancelled`,
+                content: getToolStatusContent(
+                  'cancelled',
+                  message.toolName ||
+                    t('aiChat.toolStatus.genericInputRequest', {
+                      defaultValue: 'input request',
+                    })
+                ),
               }
             : message
         ),
@@ -960,6 +1026,8 @@ export function useAIChat() {
       saveCurrentSession,
       streamChat,
       currentCluster,
+      getToolStatusContent,
+      t,
     ]
   )
 
@@ -978,8 +1046,11 @@ export function useAIChat() {
                   actionStatus: 'error' as const,
                   pendingAction: undefined,
                   toolResult:
-                    'This pending action has expired. Please ask the AI to generate the action again.',
-                  content: `${msg.toolName} failed`,
+                    t('aiChat.error.pendingActionExpired', {
+                      defaultValue:
+                        'This pending action has expired. Please ask the AI to generate the action again.',
+                    }),
+                  content: getToolStatusContent('failed', msg.toolName || ''),
                 }
               : m
           )
@@ -997,7 +1068,10 @@ export function useAIChat() {
                   ...m,
                   actionStatus: 'pending' as const,
                   pendingAction: undefined,
-                  content: `${msg.toolName} executing`,
+                  content: getToolStatusContent(
+                    'executing',
+                    msg.toolName || ''
+                  ),
                 }
               : m
           )
@@ -1039,7 +1113,10 @@ export function useAIChat() {
                       ...m,
                       actionStatus: 'error' as const,
                       toolResult: streamError,
-                      content: `${msg.toolName} failed`,
+                      content: getToolStatusContent(
+                        'failed',
+                        msg.toolName || ''
+                      ),
                     }
                   : m
               )
@@ -1055,7 +1132,10 @@ export function useAIChat() {
                       ...m,
                       actionStatus: 'error' as const,
                       toolResult: (error as Error).message,
-                      content: `${msg.toolName} failed`,
+                      content: getToolStatusContent(
+                        'failed',
+                        msg.toolName || ''
+                      ),
                     }
                   : m
               )
@@ -1076,14 +1156,21 @@ export function useAIChat() {
                   ...m,
                   actionStatus: 'error' as const,
                   toolResult: (error as Error).message,
-                  content: `${msg.toolName} failed`,
+                  content: getToolStatusContent('failed', msg.toolName || ''),
                 }
               : m
           )
         )
       }
     },
-    [appendAssistantError, readSSEStream, saveCurrentSession, updateMessages]
+    [
+      appendAssistantError,
+      getToolStatusContent,
+      readSSEStream,
+      saveCurrentSession,
+      t,
+      updateMessages,
+    ]
   )
 
   const submitInput = useCallback(
@@ -1102,8 +1189,11 @@ export function useAIChat() {
                   actionStatus: 'error' as const,
                   inputRequest: undefined,
                   toolResult:
-                    'This input request has expired. Please ask the AI again.',
-                  content: `${msg.toolName} failed`,
+                    t('aiChat.error.inputRequestExpired', {
+                      defaultValue:
+                        'This input request has expired. Please ask the AI again.',
+                    }),
+                  content: getToolStatusContent('failed', msg.toolName || ''),
                 }
               : m
           )
@@ -1121,7 +1211,10 @@ export function useAIChat() {
                   ...m,
                   actionStatus: 'pending' as const,
                   inputRequest: undefined,
-                  content: `${msg.toolName} submitting`,
+                  content: getToolStatusContent(
+                    'submitting',
+                    msg.toolName || ''
+                  ),
                 }
               : m
           )
@@ -1164,7 +1257,10 @@ export function useAIChat() {
                       actionStatus: 'error' as const,
                       inputRequest,
                       toolResult: streamError,
-                      content: `${msg.toolName} failed`,
+                      content: getToolStatusContent(
+                        'failed',
+                        msg.toolName || ''
+                      ),
                     }
                   : m
               )
@@ -1181,7 +1277,10 @@ export function useAIChat() {
                       actionStatus: 'error' as const,
                       inputRequest,
                       toolResult: (error as Error).message,
-                      content: `${msg.toolName} failed`,
+                      content: getToolStatusContent(
+                        'failed',
+                        msg.toolName || ''
+                      ),
                     }
                   : m
               )
@@ -1203,14 +1302,21 @@ export function useAIChat() {
                   actionStatus: 'error' as const,
                   inputRequest,
                   toolResult: (error as Error).message,
-                  content: `${msg.toolName} failed`,
+                  content: getToolStatusContent('failed', msg.toolName || ''),
                 }
               : m
           )
         )
       }
     },
-    [appendAssistantError, readSSEStream, saveCurrentSession, updateMessages]
+    [
+      appendAssistantError,
+      getToolStatusContent,
+      readSSEStream,
+      saveCurrentSession,
+      t,
+      updateMessages,
+    ]
   )
 
   const denyAction = useCallback(
@@ -1223,13 +1329,19 @@ export function useAIChat() {
                 actionStatus: 'denied' as const,
                 pendingAction: undefined,
                 inputRequest: undefined,
-                content: `${m.toolName || 'request'} cancelled`,
+                content: getToolStatusContent(
+                  'cancelled',
+                  m.toolName ||
+                    t('aiChat.toolStatus.genericRequest', {
+                      defaultValue: 'request',
+                    })
+                ),
               }
             : m
         )
       )
     },
-    [updateMessages]
+    [getToolStatusContent, t, updateMessages]
   )
 
   const clearMessages = useCallback(() => {

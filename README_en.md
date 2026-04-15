@@ -2,62 +2,66 @@
 
 <img src="./docs/src/banner.svg" alt="Kite Desktop Banner" width="900">
 
-# Kite Desktop
+<h1>Kite Desktop</h1>
 
-</div>
+[![Auth](https://img.shields.io/badge/Auth-eryajf-ff69b4)](https://github.com/eryajf)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/eryajf/kite-desktop)](https://github.com/eryajf/kite-desktop)
+[![Gin Version](https://img.shields.io/badge/Gin-1.6.3-brightgreen)](https://github.com/eryajf/kite-desktop)
+[![Gorm Version](https://img.shields.io/badge/Gorm-1.24.5-brightgreen)](https://github.com/eryajf/kite-desktop)
+[![GitHub Pull Requests](https://img.shields.io/github/stars/eryajf/kite-desktop)](https://github.com/eryajf/kite-desktop/stargazers)
+[![HitCount](https://views.whatilearened.today/views/github/eryajf/kite-desktop.svg)](https://github.com/eryajf/kite-desktop)
+[![GitHub license](https://img.shields.io/github/license/eryajf/kite-desktop)](https://github.com/eryajf/kite-desktop/blob/main/LICENSE)
+[![Commits](https://img.shields.io/github/commit-activity/m/eryajf/kite-desktop?color=ffff00)](https://github.com/eryajf/kite-desktop/commits/main)
 
-<div align="center">
+<p> 🪁 A Wails v3-based desktop tool for multi-cluster K8S management 🪁</p>
 
-<img src="./docs/src/logo.png" alt="Kite Desktop Logo" width="128" height="128">
+<img src="https://cdn.jsdelivr.net/gh/eryajf/tu@main/img/image_20240420_214408.gif" width="800"  height="3">
+</div><br>
 
-_A Wails v3-based desktop tool for multi-cluster K8S management._
-
-[中文说明](./README.md)
-
-</div>
+<p align="center">
+  <a href="" rel="noopener">
+ <img src="https://cdn.jsdelivr.net/gh/eryajf/tu/img/image_20260415_222836.png" alt="Project logo"></a>
+</p>
 
 ## Acknowledgement
 
 This project is based on the original open source project [Kite](https://github.com/kite-org/kite).
 
-Special thanks to the original Kite authors and contributors. The upstream project provided the core product foundation, including Kubernetes resource management, cluster workflows, backend capabilities, and the initial product direction. This repository stands on top of that work.
+First, thanks to the original Kite authors and all contributors. The upstream project already provided a very solid foundation, including Kubernetes resource management, cluster management workflows, backend capabilities, and the overall product direction. The desktop transformation in this repository is built directly on top of those results.
 
 ## Why This Repository Exists
 
-`Kite Desktop` is not a simple mirror of the original repository.
+`Kite Desktop` is not a simple mirror of the original repository, nor is it just a thin shell around it.
 
-It is a desktop-focused rework built from the original Kite codebase, with the goal of turning it into a native desktop application for Kubernetes management. The focus is shifting from a browser/server-first form into a local, installable, desktop-first product.
+This project is the result of a substantial desktop-oriented rework based on the original Kite. The goal is to gradually reshape what was originally more Web / Server oriented into a truly installable, distributable, locally usable desktop Kubernetes management tool. At the same time, the project will explore deeper integration with AI capabilities.
 
 ## Tech Stack
 
-The current desktop direction is built around:
+The current desktop edition is built on the following core stack:
 
 - `Go` for backend logic and Kubernetes integration
 - `React` for the application UI
 - `Wails v3` for desktop runtime, native windowing, system integration, and desktop packaging
 
-`Wails v3` is the key part of this transition. It is the foundation for native dialogs, local file access, external link handling, window behavior, and installer packaging for macOS and Windows releases.
+Among them, `Wails v3` is the key infrastructure behind this transformation. Many future desktop capabilities will be built on top of it, such as:
+
+- native window behavior adaptations
+- local file access
+- system file pickers
+- external link handling with the system browser
+- desktop package building and release workflows
 
 ## Project Direction
 
-From this point forward, this repository will gradually separate from the upstream Kite project and evolve independently for desktop use cases.
+From now on, this repository will gradually separate from the original Kite repository and continue evolving independently around desktop use cases.
 
 That means:
 
-- desktop-native capabilities will continue to be added
-- some web-first or server-first behavior may be reduced, adjusted, or removed
-- interaction flows will be optimized for local desktop usage
-- release, packaging, and installation experience will become first-class concerns
-
-## Current Positioning
-
-The current goal is practical:
-
-build a usable desktop edition first, then continue iterating specifically for desktop scenarios.
-
-This repository is therefore best understood as:
-
-an independent desktop-oriented branch that started from Kite, thanks Kite, and now continues in its own direction.
+- desktop-native capabilities will continue to be enhanced
+- interaction flows and feature boundaries will be adjusted for desktop usage scenarios
+- parts that are no longer suitable for desktop will be trimmed, refactored, or replaced
+- new capabilities with stronger desktop value will be introduced
+- a dedicated release, installation, and upgrade system for the desktop app will be built
 
 ## Development
 
@@ -79,51 +83,16 @@ Build the desktop app:
 make build
 ```
 
-## Current Desktop Capabilities
-
-The current desktop runtime already includes:
-
-- explicit runtime identity via `APP_RUNTIME=desktop-local`
-- backend-driven local desktop user identity
-- single instance activation
-- tray and application menu
-- window hide-on-close and window state restore
-- native file open/save flows for desktop-specific actions
-- open config/log directories from the desktop host
-
-Reference docs:
-
-- [Desktop Runtime Contract](./docs/desktop-runtime-contract.md)
-- [Desktop Feature Boundary](./docs/desktop-feature-boundary.md)
-
 ## Release Targets
 
-The project is being prepared around desktop distribution, including:
+The project will primarily be delivered as desktop installation packages, with gradual support for the following platforms:
 
 - macOS Intel
 - macOS Apple Silicon
 - Windows x64
 - Windows ARM64
 
-## Relationship With Upstream
-
-To be explicit:
-
-- full respect and thanks go to the original Kite project
-- this repository is a desktop-focused derivative work
-- future feature additions and removals will be driven by desktop needs
-- this repository will continue as an independent desktop product direction
-
 ## License
 
-Starting from the current mainline code, this repository is distributed
-under `AGPL-3.0-only`. See [LICENSE](./LICENSE).
-
-Two boundaries are worth making explicit:
-
-- released versions `v0.1.0` through `v0.1.6` remain available under the
-  original `Apache-2.0` terms they were published with
-- this repository is a deep desktop-focused derivative of upstream
-  `Kite`, so it may still contain inherited `Apache-2.0` code and
-  attribution obligations; see [NOTICE](./NOTICE) and
-  [licenses/Apache-2.0.txt](./licenses/Apache-2.0.txt)
+This repository is licensed under `AGPL-3.0-only`. See [LICENSE](./LICENSE) for details.
+> Note: this repository is a deeply modified derivative of the upstream `Kite` project. It may still contain code inherited from upstream under `Apache-2.0`, along with the corresponding attribution obligations. See [NOTICE](./NOTICE) and [licenses/Apache-2.0.txt](./licenses/Apache-2.0.txt).

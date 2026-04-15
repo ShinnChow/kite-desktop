@@ -68,7 +68,11 @@ function formatMarkdownWithSoftBreaks(content: string): string {
     .join('')
 }
 
-function describeAction(tool: string, args: Record<string, unknown>): string {
+function describeAction(
+  tool: string,
+  args: Record<string, unknown>,
+  t: (key: string, options?: Record<string, unknown>) => string
+): string {
   const kind = (args.kind as string) || ''
   const name = (args.name as string) || ''
   const ns = (args.namespace as string) || ''
@@ -76,46 +80,75 @@ function describeAction(tool: string, args: Record<string, unknown>): string {
 
   switch (tool) {
     case 'delete_resource':
-      return `Delete ${target}`
+      return t('aiChat.action.delete', {
+        defaultValue: 'Delete {{target}}',
+        target,
+      })
     case 'patch_resource': {
       const patch = args.patch as string | undefined
       if (patch) {
         try {
           const obj = JSON.parse(patch)
           if (obj?.spec?.replicas !== undefined) {
-            return `Scale ${target} to ${obj.spec.replicas} replicas`
+            return t('aiChat.action.scale', {
+              defaultValue: 'Scale {{target}} to {{replicas}} replicas',
+              target,
+              replicas: obj.spec.replicas,
+            })
           }
           const anno =
             obj?.spec?.template?.metadata?.annotations?.[
               'kubectl.kubernetes.io/restartedAt'
             ]
           if (anno) {
-            return `Restart ${target}`
+            return t('aiChat.action.restart', {
+              defaultValue: 'Restart {{target}}',
+              target,
+            })
           }
         } catch {
           // ignore
         }
-        return `Patch ${target}: ${patch.length > 80 ? patch.slice(0, 80) + '...' : patch}`
+        return t('aiChat.action.patchPreview', {
+          defaultValue: 'Patch {{target}}: {{patch}}',
+          target,
+          patch: patch.length > 80 ? patch.slice(0, 80) + '...' : patch,
+        })
       }
-      return `Patch ${target}`
+      return t('aiChat.action.patch', {
+        defaultValue: 'Patch {{target}}',
+        target,
+      })
     }
     case 'create_resource': {
       const yaml = (args.yaml as string) || ''
       const kindMatch = yaml.match(/^kind:\s*(.+)$/m)
       const nameMatch = yaml.match(/^\s*name:\s*(.+)$/m)
       if (kindMatch && nameMatch) {
-        return `Create ${kindMatch[1].trim()} ${nameMatch[1].trim()}`
+        return t('aiChat.action.createNamed', {
+          defaultValue: 'Create {{kind}} {{name}}',
+          kind: kindMatch[1].trim(),
+          name: nameMatch[1].trim(),
+        })
       }
-      return 'Create resource'
+      return t('aiChat.action.createResource', {
+        defaultValue: 'Create resource',
+      })
     }
     case 'update_resource': {
       const yaml = (args.yaml as string) || ''
       const kindMatch = yaml.match(/^kind:\s*(.+)$/m)
       const nameMatch = yaml.match(/^\s*name:\s*(.+)$/m)
       if (kindMatch && nameMatch) {
-        return `Update ${kindMatch[1].trim()} ${nameMatch[1].trim()}`
+        return t('aiChat.action.updateNamed', {
+          defaultValue: 'Update {{kind}} {{name}}',
+          kind: kindMatch[1].trim(),
+          name: nameMatch[1].trim(),
+        })
       }
-      return 'Update resource'
+      return t('aiChat.action.updateResource', {
+        defaultValue: 'Update resource',
+      })
     }
     default:
       return tool
@@ -288,7 +321,7 @@ function ToolCallMessage({
       {expanded && toolYamlPreview && (
         <div className="mt-1 rounded border bg-muted/40 p-2">
           <div className="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-            YAML
+            {t('aiChat.tool.yaml', { defaultValue: 'YAML' })}
           </div>
           <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all text-xs">
             {toolYamlPreview}
@@ -397,7 +430,10 @@ function ToolCallMessage({
                             >
                               <SelectValue
                                 placeholder={
-                                  field.placeholder || 'Select an option'
+                                  field.placeholder ||
+                                  t('aiChat.tool.selectOption', {
+                                    defaultValue: 'Select an option',
+                                  })
                                 }
                               />
                             </SelectTrigger>
@@ -441,7 +477,10 @@ function ToolCallMessage({
               })}
               <div className="flex items-center gap-2">
                 <Button size="sm" className="h-8" onClick={submitForm}>
-                  {inputRequest.submitLabel || 'Continue'}
+                  {inputRequest.submitLabel ||
+                    t('aiChat.tool.continue', {
+                      defaultValue: 'Continue',
+                    })}
                 </Button>
                 <Button
                   size="sm"
@@ -461,7 +500,8 @@ function ToolCallMessage({
           <p className="mb-1.5 text-xs font-medium text-foreground">
             {describeAction(
               message.pendingAction.tool,
-              message.pendingAction.args
+              message.pendingAction.args,
+              t
             )}
           </p>
           <div className="flex items-center gap-2">
@@ -472,7 +512,7 @@ function ToolCallMessage({
               onClick={() => onConfirm?.(message.id)}
             >
               <CheckCircle2 className="mr-1 h-3 w-3" />
-              Confirm
+              {t('aiChat.action.confirm', { defaultValue: 'Confirm' })}
             </Button>
             <Button
               size="sm"
@@ -481,7 +521,7 @@ function ToolCallMessage({
               onClick={() => onDeny?.(message.id)}
             >
               <XCircle className="mr-1 h-3 w-3" />
-              Cancel
+              {t('aiChat.action.cancel', { defaultValue: 'Cancel' })}
             </Button>
           </div>
         </div>
@@ -502,6 +542,7 @@ function MessageBubble({
   onSubmitInput?: (id: string, values: Record<string, unknown>) => void
 }) {
   const [thinkingExpanded, setThinkingExpanded] = useState(false)
+  const { t } = useTranslation()
 
   if (message.role === 'tool') {
     return (
@@ -547,7 +588,9 @@ function MessageBubble({
                   <ChevronRight
                     className={`h-3 w-3 transition-transform ${thinkingExpanded ? 'rotate-90' : ''}`}
                   />
-                  Thinking
+                  {t('aiChat.message.thinking', {
+                    defaultValue: 'Thinking',
+                  })}
                 </button>
                 {thinkingExpanded && (
                   <div className="rounded border border-dashed bg-background/60 p-2 text-xs text-muted-foreground">
@@ -587,7 +630,7 @@ function HistoryPanel({
   onNewSession: () => void
   onClose: () => void
 }) {
-  const { t } = useTranslation()
+  const { i18n, t } = useTranslation()
   const formatDate = (timestamp: number) => {
     const date = new Date(timestamp)
     const now = new Date()
@@ -596,11 +639,30 @@ function HistoryPanel({
     const diffHours = Math.floor(diffMs / 3600000)
     const diffDays = Math.floor(diffMs / 86400000)
 
-    if (diffMins < 1) return 'Just now'
-    if (diffMins < 60) return `${diffMins}m ago`
-    if (diffHours < 24) return `${diffHours}h ago`
-    if (diffDays < 7) return `${diffDays}d ago`
-    return date.toLocaleDateString()
+    if (diffMins < 1) {
+      return t('aiChat.historyRelative.justNow', {
+        defaultValue: 'Just now',
+      })
+    }
+    if (diffMins < 60) {
+      return t('aiChat.historyRelative.minutesAgo', {
+        defaultValue: '{{count}}m ago',
+        count: diffMins,
+      })
+    }
+    if (diffHours < 24) {
+      return t('aiChat.historyRelative.hoursAgo', {
+        defaultValue: '{{count}}h ago',
+        count: diffHours,
+      })
+    }
+    if (diffDays < 7) {
+      return t('aiChat.historyRelative.daysAgo', {
+        defaultValue: '{{count}}d ago',
+        count: diffDays,
+      })
+    }
+    return date.toLocaleDateString(i18n.resolvedLanguage || i18n.language)
   }
 
   return (
@@ -1013,7 +1075,7 @@ export function AIChatbox({
     }
     const url = withSubPath(`/ai-chat-box?${params.toString()}`)
     void openURL(url, {
-      title: 'Kite AI Chat',
+      title: t('aiChat.windowTitle', { defaultValue: 'Kite AI Chat' }),
       width: desktopWidth,
       height: desktopHeight,
       minWidth: 720,
@@ -1032,6 +1094,7 @@ export function AIChatbox({
     desktopHeight,
     desktopWidth,
     saveCurrentSession,
+    t,
   ])
 
   const handleSend = useCallback(() => {
@@ -1331,7 +1394,9 @@ export function AIChatbox({
             <textarea
               ref={inputRef}
               className="flex-1 min-w-0 resize-none rounded-md border bg-background px-3 py-2 text-base leading-5 placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring md:text-sm"
-              placeholder="Ask about your cluster..."
+              placeholder={t('aiChat.composer.placeholder', {
+                defaultValue: 'Ask about your cluster...',
+              })}
               rows={1}
               value={input}
               spellCheck={false}

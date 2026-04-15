@@ -1057,6 +1057,60 @@
     "history": "聊天记录",
     "openInNewTab": "在新标签页中打开",
     "close": "关闭",
+    "windowTitle": "Kite AI 对话",
+    "composer": {
+      "placeholder": "询问当前集群..."
+    },
+    "message": {
+      "thinking": "思考中"
+    },
+    "historyRelative": {
+      "justNow": "刚刚",
+      "minutesAgo": "{{count}} 分钟前",
+      "hoursAgo": "{{count}} 小时前",
+      "daysAgo": "{{count}} 天前"
+    },
+    "tool": {
+      "yaml": "YAML",
+      "selectOption": "请选择一个选项",
+      "continue": "继续"
+    },
+    "action": {
+      "confirm": "确认",
+      "cancel": "取消",
+      "delete": "删除 {{target}}",
+      "scale": "将 {{target}} 扩缩容到 {{replicas}} 个副本",
+      "restart": "重启 {{target}}",
+      "patch": "修改 {{target}}",
+      "patchPreview": "修改 {{target}}: {{patch}}",
+      "createNamed": "创建 {{kind}} {{name}}",
+      "createResource": "创建资源",
+      "updateNamed": "更新 {{kind}} {{name}}",
+      "updateResource": "更新资源"
+    },
+    "toolStatus": {
+      "calling": "正在调用 {{tool}}...",
+      "completed": "{{tool}} 已完成",
+      "failed": "{{tool}} 失败",
+      "requiresConfirmation": "{{tool}} 需要确认",
+      "requiresInput": "{{tool}} 需要输入",
+      "executing": "{{tool}} 执行中",
+      "submitting": "{{tool}} 提交中",
+      "cancelled": "{{tool}} 已取消",
+      "genericRequest": "请求",
+      "genericInputRequest": "输入请求"
+    },
+    "validation": {
+      "required": "必填"
+    },
+    "error": {
+      "message": "错误：{{message}}",
+      "missingPendingActionSession": "待确认操作 {{tool}} 缺少会话 ID",
+      "missingInputRequestSession": "输入请求 {{tool}} 缺少会话 ID",
+      "unsupportedInputRequestType": "不支持的输入请求类型：{{kind}}",
+      "pendingActionExpired": "这个待确认操作已经过期，请让 AI 重新生成一次。",
+      "inputRequestExpired": "这个输入请求已经过期，请重新向 AI 发起一次。"
+    },
     "suggestedPrompts": {
       "hint": "从一个明确的检查开始",
       "fallback": {
