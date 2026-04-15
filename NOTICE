@@ -1,0 +1,21 @@
+Kite Desktop
+Copyright (C) 2026 eryajf and contributors
+
+This repository is distributed under the GNU Affero General Public
+License v3.0 only. See ./LICENSE.
+
+Historical release boundary:
+- Tags v0.1.0 through v0.1.6 were published under Apache License 2.0.
+- The current main branch and subsequent releases are published under
+  AGPL-3.0-only unless stated otherwise.
+
+Upstream attribution:
+- This repository is a derivative work based on the upstream project
+  "Kite": https://github.com/kite-org/kite
+- Portions originating from the upstream project remain subject to the
+  Apache License 2.0 terms under which they were received.
+- A copy of Apache License 2.0 is provided in
+  ./licenses/Apache-2.0.txt
+
+When redistributing this repository, preserve all applicable copyright,
+license, and attribution notices for upstream and downstream code.
