@@ -1,0 +1,126 @@
+import '@/i18n'
+
+import { act, render, screen, waitFor } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+import i18n from '@/i18n'
+
+import { AIChatbox } from './ai-chatbox'
+
+const { useAIChatContext } = vi.hoisted(() => ({
+  useAIChatContext: vi.fn(),
+}))
+
+const { useAIChat } = vi.hoisted(() => ({
+  useAIChat: vi.fn(),
+}))
+
+vi.mock('@/contexts/ai-chat-context', () => ({
+  useAIChatContext,
+}))
+
+vi.mock('@/hooks/use-ai-chat', () => ({
+  useAIChat,
+}))
+
+vi.mock('@/hooks/use-mobile', () => ({
+  useIsMobile: () => false,
+}))
+
+vi.mock('@/lib/desktop', () => ({
+  openURL: vi.fn(),
+}))
+
+describe('AIChatbox', () => {
+  beforeEach(async () => {
+    vi.clearAllMocks()
+
+    Object.defineProperty(window.HTMLElement.prototype, 'scrollIntoView', {
+      configurable: true,
+      value: vi.fn(),
+    })
+
+    useAIChatContext.mockReturnValue({
+      isOpen: true,
+      isAvailable: true,
+      openChat: vi.fn(),
+      closeChat: vi.fn(),
+      pageContext: {
+        page: 'overview',
+        namespace: '',
+        resourceName: '',
+        resourceKind: '',
+      },
+    })
+
+    useAIChat.mockReturnValue({
+      messages: [],
+      isLoading: false,
+      history: [],
+      currentSessionId: null,
+      sendMessage: vi.fn(),
+      executeAction: vi.fn(),
+      submitInput: vi.fn(),
+      denyAction: vi.fn(),
+      stopGeneration: vi.fn(),
+      loadSession: vi.fn(),
+      deleteSession: vi.fn(),
+      newSession: vi.fn(),
+      ensureSessionId: vi.fn(() => 'session-1'),
+      saveCurrentSession: vi.fn(() => 'session-1'),
+    })
+
+    await act(async () => {
+      await i18n.changeLanguage('en')
+    })
+  })
+
+  it('updates visible ai chat copy when the language changes', async () => {
+    render(
+      <MemoryRouter initialEntries={['/ai-chat-box']}>
+        <AIChatbox standalone />
+      </MemoryRouter>
+    )
+
+    expect(screen.getByText('AI Assistant')).toBeInTheDocument()
+    expect(
+      screen.getByPlaceholderText('Ask about your cluster...')
+    ).toBeInTheDocument()
+    expect(screen.getByText('Start with a focused check')).toBeInTheDocument()
+
+    await act(async () => {
+      await i18n.changeLanguage('zh')
+    })
+
+    expect(screen.getByText('AI 助手')).toBeInTheDocument()
+    expect(screen.getByPlaceholderText('询问当前集群...')).toBeInTheDocument()
+    expect(screen.getByText('从一个明确的检查开始')).toBeInTheDocument()
+  })
+
+  it('updates visible ai chat copy when another window changes the language', async () => {
+    render(
+      <MemoryRouter initialEntries={['/ai-chat-box']}>
+        <AIChatbox standalone />
+      </MemoryRouter>
+    )
+
+    expect(screen.getByText('AI Assistant')).toBeInTheDocument()
+
+    act(() => {
+      localStorage.setItem('i18nextLng', 'zh')
+      window.dispatchEvent(
+        new StorageEvent('storage', {
+          key: 'i18nextLng',
+          newValue: 'zh',
+        })
+      )
+    })
+
+    await waitFor(() => {
+      expect(screen.getByText('AI 助手')).toBeInTheDocument()
+    })
+
+    expect(screen.getByPlaceholderText('询问当前集群...')).toBeInTheDocument()
+  })
+})

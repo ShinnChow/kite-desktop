@@ -2,19 +2,26 @@
 
 <img src="./docs/src/banner.svg" alt="Kite Desktop Banner" width="900">
 
-# Kite Desktop
+<h1>Kite Desktop</h1>
 
-</div>
+[![Auth](https://img.shields.io/badge/Auth-eryajf-ff69b4)](https://github.com/eryajf)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/eryajf/kite-desktop)](https://github.com/eryajf/kite-desktop)
+[![Gin Version](https://img.shields.io/badge/Gin-1.6.3-brightgreen)](https://github.com/eryajf/kite-desktop)
+[![Gorm Version](https://img.shields.io/badge/Gorm-1.24.5-brightgreen)](https://github.com/eryajf/kite-desktop)
+[![GitHub Pull Requests](https://img.shields.io/github/stars/eryajf/kite-desktop)](https://github.com/eryajf/kite-desktop/stargazers)
+[![HitCount](https://views.whatilearened.today/views/github/eryajf/kite-desktop.svg)](https://github.com/eryajf/kite-desktop)
+[![GitHub license](https://img.shields.io/github/license/eryajf/kite-desktop)](https://github.com/eryajf/kite-desktop/blob/main/LICENSE)
+[![Commits](https://img.shields.io/github/commit-activity/m/eryajf/kite-desktop?color=ffff00)](https://github.com/eryajf/kite-desktop/commits/main)
 
-<div align="center">
+<p> 🪁 一个基于 Wails v3 打造、面向桌面端的 K8S 多集群管理工具 🪁</p>
 
-<img src="./docs/src/logo.png" alt="Kite Desktop Logo" width="128" height="128">
+<img src="https://cdn.jsdelivr.net/gh/eryajf/tu@main/img/image_20240420_214408.gif" width="800"  height="3">
+</div><br>
 
-_一个基于 Wails v3 打造、面向桌面端的 K8S 多集群管理工具_
-
-[English](./README_en.md)
-
-</div>
+<p align="center">
+  <a href="" rel="noopener">
+ <img src="https://cdn.jsdelivr.net/gh/eryajf/tu/img/image_20260415_222917.png" alt="Project logo"></a>
+</p>
 
 ## 致谢
 
@@ -26,7 +33,7 @@ _一个基于 Wails v3 打造、面向桌面端的 K8S 多集群管理工具_
 
 `Kite Desktop` 并不是对原仓库的简单镜像，也不是只做了一层外壳包装。
 
-当前项目是在原始 Kite 基础上进行桌面端方向“魔改”的产物，目标是把原本偏 Web / Server 形态的能力，逐步重构为一个真正可安装、可分发、可本地使用的桌面端 Kubernetes 管理工具。
+当前项目是在原始 Kite 基础上进行桌面端方向“魔改”的产物，目标是把原本偏 Web / Server 形态的能力，逐步重构为一个真正可安装、可分发、可本地使用的桌面端 Kubernetes 管理工具。同时在 AI 智能融合方面做更多更深入的探索。
 
 ## 技术栈
 
@@ -55,14 +62,6 @@ _一个基于 Wails v3 打造、面向桌面端的 K8S 多集群管理工具_
 - 对不再适合桌面端的部分进行裁剪、重构或替换
 - 针对桌面端新增更有价值的能力
 - 单独建设桌面应用的发布、安装与升级体系
-
-## 当前定位
-
-当前仓库可以明确理解为：
-
-一个“基于原项目 Kite 深度改造而来的桌面端分支项目”。
-
-它保留了对原项目的感谢与尊重，但后续不再以“尽量保持与原仓库一致”为目标，而是会围绕桌面端体验和桌面端需求，独立做功能增减和产品演进。
 
 ## 开发方式
 
@@ -93,27 +92,7 @@ make build
 - Windows x64
 - Windows ARM64
 
-## 与原仓库的关系
-
-这里明确说明一下：
-
-- 原始 Kite 项目是当前仓库的重要基础来源
-- 当前仓库会持续保留对原项目的致谢
-- 当前仓库已经开始走向独立的桌面端方向
-- 后续功能的增加、删除与重构，将优先服务于桌面端产品目标
-
-## 最后说明
-
-这个仓库后续的核心任务，不是继续维护一个传统 Web 版 Kubernetes Dashboard，而是持续把它打磨成一个真正好用的桌面端 Kubernetes 管理应用。
-
-感谢原项目 Kite 提供的基础。
-从现在开始，这个项目将作为桌面端方向的独立分支，继续演进。
-
 ## 许可证
 
-从当前主线代码开始，本仓库改为使用 `AGPL-3.0-only`，详见 [LICENSE](./LICENSE)。
-
-同时说明两个边界：
-
-- 已经发布的 `v0.1.0` 到 `v0.1.6` 版本，继续按当时发布时的 `Apache-2.0` 生效
-- 当前仓库基于上游 `Kite` 深度改造而来，仓库内仍可能包含继承自上游的 `Apache-2.0` 代码与署名义务，相关说明见 [NOTICE](./NOTICE) 与 [licenses/Apache-2.0.txt](./licenses/Apache-2.0.txt)
+本仓库使用 `AGPL-3.0-only`，详见 [LICENSE](./LICENSE)。
+>注意：当前仓库基于上游 `Kite` 深度改造而来，仓库内仍可能包含继承自上游的 `Apache-2.0` 代码与署名义务，相关说明见 [NOTICE](./NOTICE) 与 [licenses/Apache-2.0.txt](./licenses/Apache-2.0.txt)
