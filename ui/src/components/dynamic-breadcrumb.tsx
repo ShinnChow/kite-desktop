@@ -27,6 +27,14 @@ export function DynamicBreadcrumb() {
       return breadcrumbs
     }
 
+    if (
+      pathSegments.length === 2 &&
+      pathSegments[0] === 'networking' &&
+      pathSegments[1] === 'advanced'
+    ) {
+      return [{ label: t('nav.advancedNetworking') }]
+    }
+
     // Resource name mappings
     const resourceLabels: Record<string, string> = {
       pods: t('nav.pods'),
@@ -39,12 +47,21 @@ export function DynamicBreadcrumb() {
       gateways: t('nav.gateways'),
       httproutes: t('nav.httproutes'),
       jobs: t('nav.jobs'),
+      cronjobs: t('nav.cronjobs'),
       daemonsets: t('nav.daemonsets'),
       statefulsets: t('nav.statefulsets'),
       namespaces: t('nav.namespaces'),
-      pvcs: t('sidebar.short.pvcs'),
+      nodes: t('nav.nodes'),
+      events: t('nav.events'),
+      persistentvolumeclaims: t('nav.persistentvolumeclaims'),
+      persistentvolumes: t('nav.persistentvolumes'),
       crds: t('nav.crds'),
       crs: t('nav.customResources'),
+      serviceaccounts: t('nav.serviceaccounts'),
+      roles: t('nav.roles'),
+      rolebindings: t('nav.rolebindings'),
+      clusterroles: t('nav.clusterroles'),
+      clusterrolebindings: t('nav.clusterrolebindings'),
       horizontalpodautoscalers: t('nav.horizontalpodautoscalers'),
     }
 

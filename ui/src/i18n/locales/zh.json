@@ -95,14 +95,15 @@
     "daemonsets": "守护进程集",
     "jobs": "任务",
     "services": "服务",
-    "ingresses": "入口",
+    "ingresses": "Ingress",
     "networkpolicies": "网络策略",
     "gateways": "网关",
     "httproutes": "HTTP 路由",
-    "configMaps": "配置映射",
+    "advancedNetworking": "高级网络",
+    "configMaps": "配置项",
     "secrets": "密钥",
-    "persistentvolumeclaims": "持久卷声明",
-    "persistentvolumes": "持久卷",
+    "persistentvolumeclaims": "存储声明",
+    "persistentvolumes": "存储卷",
     "nodes": "节点",
     "namespaces": "命名空间",
     "customResources": "自定义资源",
@@ -119,15 +120,17 @@
     "rolebindings": "角色绑定",
     "clusterroles": "集群角色",
     "clusterrolebindings": "集群角色绑定",
-    "horizontalpodautoscalers": "Pod 水平自动扩缩"
+    "horizontalpodautoscalers": "HPA"
   },
   "sidebar": {
     "groups": {
-      "traffic": "流量",
+      "cluster": "集群",
+      "network": "网络",
       "storage": "存储",
       "config": "配置",
-      "other": "其他",
-      "security": "安全"
+      "security": "安全",
+      "workloads": "工作负载",
+      "extension": "扩展"
     },
     "short": {
       "pvcs": "PVCs",
@@ -152,6 +155,9 @@
     "expand": "展开",
     "collapse": "折叠",
     "newVersionAvailable": "发现新版本"
+  },
+  "advancedNetworking": {
+    "description": "在一个页面中统一查看网络策略、网关和 HTTP 路由"
   },
   "overview": {
     "title": "概览",

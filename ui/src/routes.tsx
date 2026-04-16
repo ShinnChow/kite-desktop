@@ -2,6 +2,7 @@ import { createBrowserRouter } from 'react-router-dom'
 
 import App, { StandaloneAIChatApp } from './App'
 import { getSubPath } from './lib/subpath'
+import { AdvancedNetworkingPage } from './pages/advanced-networking'
 import { CRListPage } from './pages/cr-list-page'
 import { Overview } from './pages/overview'
 import { ResourceDetail } from './pages/resource-detail'
@@ -31,6 +32,10 @@ export const router = createBrowserRouter(
         {
           path: 'settings',
           element: <SettingsPage />,
+        },
+        {
+          path: 'networking/advanced',
+          element: <AdvancedNetworkingPage />,
         },
         {
           path: 'crds/:crd',
