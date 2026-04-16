@@ -1,10 +1,15 @@
 import { render, screen } from '@testing-library/react'
-import { RouterProvider } from 'react-router-dom'
+import { Outlet, RouterProvider } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('./App', () => ({
   __esModule: true,
-  default: () => <div>app shell</div>,
+  default: () => (
+    <div>
+      <div>app shell</div>
+      <Outlet />
+    </div>
+  ),
   StandaloneAIChatApp: () => <div>standalone ai chat</div>,
 }))
 
@@ -46,6 +51,23 @@ describe('router', () => {
     expect(await screen.findByText('app shell')).toBeInTheDocument()
     expect(screen.queryByTestId('init-check-route')).not.toBeInTheDocument()
     expect(screen.queryByTestId('protected-route')).not.toBeInTheDocument()
+  })
+
+  it('registers the advanced networking aggregate route before generic resources', () => {
+    const rootRoute = (
+      router as unknown as {
+        routes: Array<{ path?: string; children?: Array<{ path?: string }> }>
+      }
+    ).routes.find((route) => route.path === '/')
+
+    const childPaths = rootRoute?.children?.map((route) => route.path) || []
+    const advancedNetworkingIndex = childPaths.indexOf('networking/advanced')
+    const resourceDetailIndex = childPaths.indexOf(':resource/:name')
+    const resourceListIndex = childPaths.indexOf(':resource')
+
+    expect(advancedNetworkingIndex).toBeGreaterThan(-1)
+    expect(advancedNetworkingIndex).toBeLessThan(resourceDetailIndex)
+    expect(advancedNetworkingIndex).toBeLessThan(resourceListIndex)
   })
 
   it('does not register /login or /setup routes', () => {

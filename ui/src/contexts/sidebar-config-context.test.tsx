@@ -7,7 +7,7 @@ import {
 } from './sidebar-config-context'
 
 const workloadsGroupId = 'sidebar-groups-workloads'
-const trafficGroupId = 'sidebar-groups-traffic'
+const networkGroupId = 'sidebar-groups-network'
 const workloadsPodsItemId = 'sidebar-groups-workloads--pods'
 const customGroupId = 'custom-my-group'
 const customGroupItemId = 'custom-my-group-widgets-example-com'
@@ -37,6 +37,12 @@ function SidebarConfigConsumer() {
     (group) => group.id === workloadsGroupId
   )
   const customGroup = config.groups.find((group) => group.id === customGroupId)
+  const securityGroup = config.groups.find(
+    (group) => group.id === 'sidebar-groups-security'
+  )
+  const extensionGroup = config.groups.find(
+    (group) => group.id === 'sidebar-groups-extension'
+  )
 
   return (
     <div>
@@ -50,6 +56,12 @@ function SidebarConfigConsumer() {
       </div>
       <div data-testid="workloads-collapsed">
         {String(workloadsGroup?.collapsed)}
+      </div>
+      <div data-testid="security-collapsed">
+        {String(securityGroup?.collapsed)}
+      </div>
+      <div data-testid="extension-collapsed">
+        {String(extensionGroup?.collapsed)}
       </div>
       <div data-testid="custom-groups">
         {config.groups
@@ -88,8 +100,8 @@ function SidebarConfigConsumer() {
       <button type="button" onClick={() => moveGroup(workloadsGroupId, 'down')}>
         move workloads down
       </button>
-      <button type="button" onClick={() => moveGroup(trafficGroupId, 'up')}>
-        move traffic up
+      <button type="button" onClick={() => moveGroup(networkGroupId, 'up')}>
+        move network up
       </button>
       <button type="button" onClick={() => createCustomGroup('My Group')}>
         create custom group
@@ -225,6 +237,9 @@ describe('SidebarConfigProvider', () => {
   it('toggles group visibility and collapsed state', async () => {
     await renderProvider()
 
+    expect(screen.getByTestId('security-collapsed')).toHaveTextContent('true')
+    expect(screen.getByTestId('extension-collapsed')).toHaveTextContent('true')
+
     fireEvent.click(
       screen.getByRole('button', { name: 'toggle workloads visibility' })
     )
@@ -247,12 +262,13 @@ describe('SidebarConfigProvider', () => {
 
     expect(screen.getByTestId('group-order')).toHaveTextContent(
       [
+        'sidebar-groups-cluster',
         workloadsGroupId,
-        trafficGroupId,
-        'sidebar-groups-storage',
+        networkGroupId,
         'sidebar-groups-config',
+        'sidebar-groups-storage',
         'sidebar-groups-security',
-        'sidebar-groups-other',
+        'sidebar-groups-extension',
       ].join(',')
     )
 
@@ -261,11 +277,12 @@ describe('SidebarConfigProvider', () => {
       expect(screen.getByTestId('group-order')).toHaveTextContent(
         [
           workloadsGroupId,
-          trafficGroupId,
-          'sidebar-groups-storage',
+          'sidebar-groups-cluster',
+          networkGroupId,
           'sidebar-groups-config',
+          'sidebar-groups-storage',
           'sidebar-groups-security',
-          'sidebar-groups-other',
+          'sidebar-groups-extension',
         ].join(',')
       )
     )
@@ -274,29 +291,119 @@ describe('SidebarConfigProvider', () => {
     await waitFor(() =>
       expect(screen.getByTestId('group-order')).toHaveTextContent(
         [
-          trafficGroupId,
+          'sidebar-groups-cluster',
           workloadsGroupId,
-          'sidebar-groups-storage',
+          networkGroupId,
           'sidebar-groups-config',
+          'sidebar-groups-storage',
           'sidebar-groups-security',
-          'sidebar-groups-other',
+          'sidebar-groups-extension',
         ].join(',')
       )
     )
 
-    fireEvent.click(screen.getByRole('button', { name: 'move traffic up' }))
+    fireEvent.click(screen.getByRole('button', { name: 'move network up' }))
     await waitFor(() =>
       expect(screen.getByTestId('group-order')).toHaveTextContent(
         [
-          trafficGroupId,
+          'sidebar-groups-cluster',
+          networkGroupId,
           workloadsGroupId,
-          'sidebar-groups-storage',
           'sidebar-groups-config',
+          'sidebar-groups-storage',
           'sidebar-groups-security',
-          'sidebar-groups-other',
+          'sidebar-groups-extension',
         ].join(',')
       )
     )
+  })
+
+  it('migrates legacy sidebar configs to the new group structure', async () => {
+    storedSidebarPreference = JSON.stringify({
+      version: 1,
+      groups: [
+        {
+          id: 'sidebar-groups-workloads',
+          nameKey: 'sidebar.groups.workloads',
+          visible: true,
+          collapsed: false,
+          order: 0,
+          items: [
+            {
+              id: workloadsPodsItemId,
+              titleKey: 'nav.pods',
+              url: '/pods',
+              icon: 'IconBox',
+              visible: true,
+              pinned: false,
+              order: 0,
+            },
+          ],
+        },
+        {
+          id: 'sidebar-groups-other',
+          nameKey: 'sidebar.groups.other',
+          visible: true,
+          collapsed: false,
+          order: 1,
+          items: [
+            {
+              id: 'sidebar-groups-other--nodes',
+              titleKey: 'nav.nodes',
+              url: '/nodes',
+              icon: 'IconServer2',
+              visible: true,
+              pinned: false,
+              order: 0,
+            },
+            {
+              id: 'sidebar-groups-other--events',
+              titleKey: 'nav.events',
+              url: '/events',
+              icon: 'IconBell',
+              visible: true,
+              pinned: false,
+              order: 1,
+            },
+            {
+              id: 'sidebar-groups-other--crds',
+              titleKey: 'nav.crds',
+              url: '/crds',
+              icon: 'IconCode',
+              visible: true,
+              pinned: false,
+              order: 2,
+            },
+          ],
+        },
+      ],
+      hiddenItems: ['sidebar-groups-other--events'],
+      pinnedItems: ['sidebar-groups-other--nodes'],
+      groupOrder: ['sidebar-groups-workloads', 'sidebar-groups-other'],
+      lastUpdated: Date.now(),
+    })
+
+    await renderProvider()
+
+    expect(screen.getByTestId('group-order')).toHaveTextContent(
+      [
+        'sidebar-groups-cluster',
+        'sidebar-groups-workloads',
+        'sidebar-groups-network',
+        'sidebar-groups-config',
+        'sidebar-groups-storage',
+        'sidebar-groups-security',
+        'sidebar-groups-extension',
+      ].join(',')
+    )
+    expect(screen.getByTestId('pinned-items')).toHaveTextContent(
+      'sidebar-groups-cluster--nodes'
+    )
+    expect(screen.getByTestId('hidden-items')).toHaveTextContent(
+      'sidebar-groups-cluster--events'
+    )
+    expect(screen.getByTestId('security-collapsed')).toHaveTextContent('true')
+    expect(screen.getByTestId('extension-collapsed')).toHaveTextContent('true')
   })
 
   it('creates a custom group and manages CRD items inside it', async () => {

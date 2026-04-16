@@ -67,12 +67,13 @@
   },
   "sidebar": {
     "groups": {
-      "traffic": "traffic",
-      "storage": "storage",
-      "config": "config",
-      "other": "other",
+      "cluster": "Cluster",
+      "network": "Network",
+      "storage": "Storage",
+      "config": "Config",
       "security": "Security",
-      "workloads": "Workloads"
+      "workloads": "Workloads",
+      "extension": "Extension"
     },
     "short": {
       "pvcs": "PVCs",
@@ -102,14 +103,15 @@
     "daemonsets": "DaemonSets",
     "jobs": "Jobs",
     "services": "Services",
-    "ingresses": "Ingresses",
+    "ingresses": "Ingress",
     "networkpolicies": "Network Policies",
     "gateways": "Gateways",
     "httproutes": "HTTP Routes",
-    "configMaps": "ConfigMaps",
+    "advancedNetworking": "Advanced Networking",
+    "configMaps": "Config Items",
     "secrets": "Secrets",
-    "persistentvolumeclaims": "Persistent Volume Claims",
-    "persistentvolumes": "Persistent Volumes",
+    "persistentvolumeclaims": "Storage Claims",
+    "persistentvolumes": "Storage Volumes",
     "nodes": "Nodes",
     "namespaces": "Namespaces",
     "customResources": "Custom Resources",
@@ -126,6 +128,9 @@
     "clusterroles": "Cluster Roles",
     "clusterrolebindings": "Cluster Role Bindings",
     "horizontalpodautoscalers": "HPA"
+  },
+  "advancedNetworking": {
+    "description": "Manage network policies, gateways, and HTTP routes in one place"
   },
   "overview": {
     "title": "Overview",
