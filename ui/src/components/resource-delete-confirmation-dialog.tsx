@@ -16,6 +16,7 @@ interface ResourceDeleteConfirmationDialogProps {
   resourceType: ResourceType
   namespace?: string
   additionalNote?: string
+  requireNameConfirmation?: boolean
 }
 
 export function ResourceDeleteConfirmationDialog({
@@ -25,6 +26,7 @@ export function ResourceDeleteConfirmationDialog({
   resourceType,
   namespace,
   additionalNote,
+  requireNameConfirmation = true,
 }: ResourceDeleteConfirmationDialogProps) {
   const [isDeleting, setIsDeleting] = useState(false)
   const navigate = useNavigate()
@@ -62,6 +64,7 @@ export function ResourceDeleteConfirmationDialog({
       namespace={namespace}
       additionalNote={additionalNote}
       showAdditionalOptions={true}
+      requireNameConfirmation={requireNameConfirmation}
     />
   )
 }

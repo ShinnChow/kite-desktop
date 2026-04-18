@@ -159,6 +159,11 @@
     "emptyFilteredDescription": "Try adjusting the keyword, resource type, or namespace filters",
     "clearFilters": "Clear filters"
   },
+  "simpleTable": {
+    "showingEntries": "Showing {{start}} - {{end}} of {{total}} entries",
+    "previous": "Previous",
+    "next": "Next"
+  },
   "pods": {
     "title": "Pods",
     "ready": "Ready",

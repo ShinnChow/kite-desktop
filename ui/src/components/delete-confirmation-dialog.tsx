@@ -25,6 +25,7 @@ interface DeleteConfirmationDialogProps {
   namespace?: string
   additionalNote?: string
   showAdditionalOptions?: boolean
+  requireNameConfirmation?: boolean
 }
 
 export function DeleteConfirmationDialog({
@@ -37,6 +38,7 @@ export function DeleteConfirmationDialog({
   namespace,
   additionalNote,
   showAdditionalOptions = false,
+  requireNameConfirmation = true,
 }: DeleteConfirmationDialogProps) {
   const { t } = useTranslation()
   const [confirmationInput, setConfirmationInput] = useState('')
@@ -47,17 +49,21 @@ export function DeleteConfirmationDialog({
     if (!open) {
       setConfirmationInput('')
       setForceDelete(false)
+      setWait(true)
     }
     onOpenChange(open)
   }
 
   const handleConfirm = () => {
-    if (confirmationInput === resourceName) {
-      onConfirm(forceDelete, wait)
+    if (requireNameConfirmation && confirmationInput !== resourceName) {
+      return
     }
+
+    onConfirm(forceDelete, wait)
   }
 
-  const isConfirmDisabled = confirmationInput !== resourceName || isDeleting
+  const isConfirmDisabled =
+    isDeleting || (requireNameConfirmation && confirmationInput !== resourceName)
 
   return (
     <Dialog open={open} onOpenChange={handleDialogChange}>
@@ -110,20 +116,22 @@ export function DeleteConfirmationDialog({
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="confirmation">
-              {t('deleteConfirmation.typeToConfirm')}{' '}
-              <span className=" font-semibold">{resourceName}</span>{' '}
-              {t('deleteConfirmation.toConfirm')}
-            </Label>
-            <Input
-              id="confirmation"
-              value={confirmationInput}
-              onChange={(e) => setConfirmationInput(e.target.value)}
-              placeholder={resourceName}
-              autoComplete="off"
-            />
-          </div>
+          {requireNameConfirmation && (
+            <div className="space-y-2">
+              <Label htmlFor="confirmation">
+                {t('deleteConfirmation.typeToConfirm')}{' '}
+                <span className=" font-semibold">{resourceName}</span>{' '}
+                {t('deleteConfirmation.toConfirm')}
+              </Label>
+              <Input
+                id="confirmation"
+                value={confirmationInput}
+                onChange={(e) => setConfirmationInput(e.target.value)}
+                placeholder={resourceName}
+                autoComplete="off"
+              />
+            </div>
+          )}
           {showAdditionalOptions && (
             <>
               <div className="flex items-center space-x-2">

@@ -186,6 +186,11 @@
     "emptyFilteredDescription": "试试调整搜索词、资源类型或命名空间筛选条件",
     "clearFilters": "清空筛选"
   },
+  "simpleTable": {
+    "showingEntries": "显示第 {{start}} - {{end}} 条，共 {{total}} 条",
+    "previous": "上一页",
+    "next": "下一页"
+  },
   "pods": {
     "title": "Pods",
     "ready": "就绪",

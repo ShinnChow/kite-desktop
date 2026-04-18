@@ -505,6 +505,20 @@ export function DeploymentDetail(props: { namespace: string; name: string }) {
                   </CardContent>
                 </Card>
 
+                {relatedPods ? (
+                  <PodTable
+                    pods={relatedPods}
+                    isLoading={isLoadingPods}
+                    labelSelector={labelSelector}
+                    title={
+                      <>
+                        Pods{' '}
+                        <Badge variant="secondary">{relatedPods.length}</Badge>
+                      </>
+                    }
+                  />
+                ) : null}
+
                 {/* Conditions */}
                 {status?.conditions && (
                   <Card>
@@ -560,24 +574,6 @@ export function DeploymentDetail(props: { namespace: string; name: string }) {
           },
           ...(relatedPods
             ? [
-                {
-                  value: 'pods',
-                  label: (
-                    <>
-                      Pods{' '}
-                      {relatedPods && (
-                        <Badge variant="secondary">{relatedPods.length}</Badge>
-                      )}
-                    </>
-                  ),
-                  content: (
-                    <PodTable
-                      pods={relatedPods}
-                      isLoading={isLoadingPods}
-                      labelSelector={labelSelector}
-                    />
-                  ),
-                },
                 {
                   value: 'logs',
                   label: t('detail.tabs.logs'),

@@ -1,27 +1,55 @@
-import { useMemo } from 'react'
-import { IconLoader } from '@tabler/icons-react'
+import { type ReactNode, useMemo, useState } from 'react'
+import { IconLoader, IconTrash } from '@tabler/icons-react'
 import { Pod } from 'kubernetes-types/core/v1'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
+import { toast } from 'sonner'
 
 import { MetricsData, PodWithMetrics } from '@/types/api'
+import { deleteResource } from '@/lib/api'
 import { getPodStatus } from '@/lib/k8s'
-import { formatDate, translatePodStatus } from '@/lib/utils'
+import { formatDate, translateError, translatePodStatus } from '@/lib/utils'
 
+import { DeleteConfirmationDialog } from './delete-confirmation-dialog'
+import { DescribeDialog } from './describe-dialog'
 import { MetricCell } from './metrics-cell'
 import { PodStatusIcon } from './pod-status-icon'
 import { Column, SimpleTable } from './simple-table'
 import { Badge } from './ui/badge'
+import { Button } from './ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
+import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip'
+
+type PodImageEntry = {
+  name: string
+  image: string
+}
+
+function toCompactImageName(image: string) {
+  if (!image || image === '-') return '-'
+
+  const digestIndex = image.lastIndexOf('@')
+  if (digestIndex >= 0) {
+    return image.slice(image.lastIndexOf('/') + 1)
+  }
+
+  const lastSlashIndex = image.lastIndexOf('/')
+  return lastSlashIndex >= 0 ? image.slice(lastSlashIndex + 1) : image
+}
 
 export function PodTable(props: {
   pods?: PodWithMetrics[]
   labelSelector?: string
   isLoading?: boolean
   hiddenNode?: boolean
+  title?: ReactNode
 }) {
   const { t } = useTranslation()
-  const { pods, isLoading } = props
+  const { pods, isLoading, title } = props
+  const [podPendingDelete, setPodPendingDelete] = useState<{
+    name: string
+    namespace?: string
+  } | null>(null)
 
   // Pod table columns
   const podColumns = useMemo(
@@ -77,6 +105,53 @@ export function PodTable(props: {
         },
       },
       {
+        header: t('containerEditor.tabs.image'),
+        accessor: (pod: Pod) =>
+          pod.spec?.containers?.map((container) => ({
+            name: container.name,
+            image: container.image || '-',
+          })) || [],
+        cell: (value: unknown) => {
+          const images = value as PodImageEntry[]
+
+          if (images.length === 0) {
+            return <span className="text-sm text-muted-foreground">-</span>
+          }
+
+          const summary = images
+            .map((entry) => `${entry.name}: ${toCompactImageName(entry.image)}`)
+            .join(' | ')
+
+          return (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div
+                  className="max-w-[320px] truncate text-xs text-muted-foreground"
+                  title={summary}
+                >
+                  <span className="font-mono">{summary}</span>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-md">
+                <div className="space-y-2">
+                  {images.map((entry) => (
+                    <div key={`${entry.name}-${entry.image}`} className="min-w-0">
+                      <div className="text-xs text-muted-foreground">
+                        {entry.name}
+                      </div>
+                      <div className="font-mono text-xs break-all">
+                        {entry.image}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </TooltipContent>
+            </Tooltip>
+          )
+        },
+        align: 'left' as const,
+      },
+      {
         header: t('monitoring.cpuUsage'),
         accessor: (pod: PodWithMetrics) => {
           return pod.metrics
@@ -127,9 +202,62 @@ export function PodTable(props: {
           )
         },
       },
+      {
+        header: t('common.actions'),
+        accessor: (pod: Pod) => pod,
+        cell: (value: unknown) => {
+          const pod = value as Pod
+          const podName = pod.metadata?.name || ''
+          const namespace = pod.metadata?.namespace
+
+          return (
+            <div className="flex items-center justify-center gap-2">
+              <DescribeDialog
+                resourceType="pods"
+                namespace={namespace}
+                name={podName}
+              />
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() =>
+                  setPodPendingDelete({
+                    name: podName,
+                    namespace,
+                  })
+                }
+                disabled={!podName}
+              >
+                <IconTrash className="h-4 w-4" />
+                {t('detail.buttons.delete')}
+              </Button>
+            </div>
+          )
+        },
+      },
     ],
     [props.hiddenNode, t]
   )
+
+  const handleDelete = async (force?: boolean, wait?: boolean) => {
+    const targetPod = podPendingDelete
+    if (!targetPod) return
+
+    setPodPendingDelete(null)
+    try {
+      await deleteResource('pods', targetPod.name, targetPod.namespace, {
+        force,
+        wait,
+      })
+      toast.success(
+        t('detail.status.deleted', {
+          resource: targetPod.name,
+        })
+      )
+    } catch (error) {
+      toast.error(translateError(error, t))
+    }
+  }
 
   if (isLoading) {
     return (
@@ -142,13 +270,15 @@ export function PodTable(props: {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{t('pods.title')}</CardTitle>
+        <CardTitle>{title ?? t('pods.title')}</CardTitle>
       </CardHeader>
       <CardContent>
         <SimpleTable
           data={pods || []}
           columns={podColumns}
           emptyMessage={t('podTable.empty')}
+          stickyFirstColumn
+          stickyLastColumn
           pagination={{
             enabled: true,
             pageSize: 20,
@@ -156,6 +286,20 @@ export function PodTable(props: {
           }}
         />
       </CardContent>
+      <DeleteConfirmationDialog
+        open={podPendingDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPodPendingDelete(null)
+          }
+        }}
+        resourceName={podPendingDelete?.name || ''}
+        resourceType="pod"
+        namespace={podPendingDelete?.namespace}
+        onConfirm={handleDelete}
+        showAdditionalOptions={true}
+        requireNameConfirmation={false}
+      />
     </Card>
   )
 }

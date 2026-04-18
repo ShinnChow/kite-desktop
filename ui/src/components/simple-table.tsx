@@ -1,4 +1,7 @@
 import React, { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
+
+import { cn } from '@/lib/utils'
 
 import { Button } from './ui/button'
 import {
@@ -28,6 +31,8 @@ interface SimpleTableProps<T> {
     currentPage?: number
     onPageChange?: (page: number) => void
   }
+  stickyFirstColumn?: boolean
+  stickyLastColumn?: boolean
 }
 
 export function SimpleTable<T>({
@@ -35,7 +40,10 @@ export function SimpleTable<T>({
   columns,
   emptyMessage = 'No data available',
   pagination,
+  stickyFirstColumn = false,
+  stickyLastColumn = false,
 }: SimpleTableProps<T>) {
+  const { t } = useTranslation()
   const isControlled =
     pagination &&
     typeof pagination.currentPage === 'number' &&
@@ -79,6 +87,9 @@ export function SimpleTable<T>({
     }
   }, [data, currentPage, paginationConfig])
 
+  const shouldShowPagination =
+    paginationConfig.enabled && totalPages > 1 && data.length > 0
+
   const handlePreviousPage = () => {
     if (isControlled) {
       setCurrentPage(Math.max(currentPage - 1, 1))
@@ -98,22 +109,34 @@ export function SimpleTable<T>({
   const handlePageChange = (page: number) => {
     setCurrentPage(page)
   }
+
+  const getColumnClassName = (
+    index: number,
+    align: Column<T>['align'],
+    isHeader = false
+  ) =>
+    cn(
+      align === 'left'
+        ? 'text-left'
+        : align === 'right'
+          ? 'text-right'
+          : 'text-center',
+      stickyFirstColumn &&
+        index === 0 &&
+        'sticky left-0 z-20 bg-background shadow-[10px_0_12px_-12px_color-mix(in_oklab,var(--color-foreground)_16%,transparent)]',
+      stickyLastColumn &&
+        index === columns.length - 1 &&
+        'sticky right-0 z-20 bg-background shadow-[-10px_0_12px_-12px_color-mix(in_oklab,var(--color-foreground)_16%,transparent)]',
+      isHeader && 'z-30'
+    )
+
   return (
     <div className="space-y-4">
-      <Table>
+      <Table containerClassName="table-scroll-thin">
         <TableHeader>
           <TableRow>
             {columns.map((column, index) => (
-              <TableHead
-                key={index}
-                className={
-                  column.align === 'left'
-                    ? 'text-left'
-                    : column.align === 'right'
-                      ? 'text-right'
-                      : 'text-center'
-                }
-              >
+              <TableHead key={index} className={getColumnClassName(index, column.align, true)}>
                 {column.header}
               </TableHead>
             ))}
@@ -135,13 +158,7 @@ export function SimpleTable<T>({
                 {columns.map((column, colIndex) => (
                   <TableCell
                     key={colIndex}
-                    className={
-                      column.align === 'left'
-                        ? 'text-left'
-                        : column.align === 'right'
-                          ? 'text-right'
-                          : 'text-center'
-                    }
+                    className={getColumnClassName(colIndex, column.align)}
                   >
                     {column.cell(column.accessor(item))}
                   </TableCell>
@@ -152,11 +169,15 @@ export function SimpleTable<T>({
         </TableBody>
       </Table>
 
-      {paginationConfig.enabled && data.length > 0 && (
+      {shouldShowPagination && (
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           {paginationConfig.showPageInfo && (
             <div className="text-sm text-muted-foreground">
-              Showing {startIndex} - {endIndex} of {data.length} entries
+              {t('simpleTable.showingEntries', {
+                start: startIndex,
+                end: endIndex,
+                total: data.length,
+              })}
             </div>
           )}
 
@@ -167,7 +188,7 @@ export function SimpleTable<T>({
               onClick={handlePreviousPage}
               disabled={currentPage === 1}
             >
-              Previous
+              {t('simpleTable.previous')}
             </Button>
 
             <div className="flex flex-wrap items-center gap-1">
@@ -208,7 +229,7 @@ export function SimpleTable<T>({
               onClick={handleNextPage}
               disabled={currentPage === totalPages}
             >
-              Next
+              {t('simpleTable.next')}
             </Button>
           </div>
         </div>
