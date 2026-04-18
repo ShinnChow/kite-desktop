@@ -32,7 +32,7 @@ func TestMain(m *testing.M) {
 
 func TestGetPreferenceClusterNamePrecedence(t *testing.T) {
 	t.Run("context beats header query and cookie", func(t *testing.T) {
-		ctx := newFavoriteContextWithRequest(t, http.MethodGet, "/favorites", nil)
+		ctx := newFavoriteContextWithRequest(t, "/favorites", nil)
 		ctx.Set(middleware.ClusterNameKey, "context-cluster")
 		ctx.Request.Header.Set(middleware.ClusterNameHeader, "header-cluster")
 		ctx.Request.URL.RawQuery = middleware.ClusterNameHeader + "=query-cluster"
@@ -43,7 +43,7 @@ func TestGetPreferenceClusterNamePrecedence(t *testing.T) {
 	})
 
 	t.Run("header beats query and cookie", func(t *testing.T) {
-		ctx := newFavoriteContextWithRequest(t, http.MethodGet, "/favorites", nil)
+		ctx := newFavoriteContextWithRequest(t, "/favorites", nil)
 		ctx.Request.Header.Set(middleware.ClusterNameHeader, "header-cluster")
 		ctx.Request.URL.RawQuery = middleware.ClusterNameHeader + "=query-cluster"
 
@@ -53,7 +53,7 @@ func TestGetPreferenceClusterNamePrecedence(t *testing.T) {
 	})
 
 	t.Run("query beats cookie", func(t *testing.T) {
-		ctx := newFavoriteContextWithRequest(t, http.MethodGet, "/favorites", nil)
+		ctx := newFavoriteContextWithRequest(t, "/favorites", nil)
 		ctx.Request.URL.RawQuery = middleware.ClusterNameHeader + "=query-cluster"
 
 		if got := getPreferenceClusterName(ctx); got != "query-cluster" {
@@ -62,7 +62,7 @@ func TestGetPreferenceClusterNamePrecedence(t *testing.T) {
 	})
 
 	t.Run("cookie fallback", func(t *testing.T) {
-		ctx := newFavoriteContextWithRequest(t, http.MethodGet, "/favorites", nil)
+		ctx := newFavoriteContextWithRequest(t, "/favorites", nil)
 
 		if got := getPreferenceClusterName(ctx); got != "cookie-cluster" {
 			t.Fatalf("getPreferenceClusterName() = %q, want %q", got, "cookie-cluster")
@@ -156,13 +156,13 @@ func setupFavoriteHandlerTestDB(t *testing.T) {
 	}
 }
 
-func newFavoriteContextWithRequest(t *testing.T, method, path string, body []byte) *gin.Context {
+func newFavoriteContextWithRequest(t *testing.T, path string, body []byte) *gin.Context {
 	t.Helper()
 
 	gin.SetMode(gin.TestMode)
 	rec := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(rec)
-	req := httptest.NewRequest(method, path, bytes.NewReader(body))
+	req := httptest.NewRequest(http.MethodGet, path, bytes.NewReader(body))
 	req.AddCookie(&http.Cookie{Name: middleware.ClusterNameHeader, Value: "cookie-cluster"})
 	ctx.Request = req
 	return ctx
