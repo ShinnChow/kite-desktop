@@ -13,6 +13,7 @@ const apiMocks = vi.hoisted(() => ({
   listFavoriteResources: vi.fn(),
   removeFavoriteResource: vi.fn(),
 }))
+let currentClusterMock = 'cluster-a'
 
 vi.mock('@/lib/api', async () => {
   const actual = await vi.importActual<typeof import('@/lib/api')>('@/lib/api')
@@ -24,6 +25,12 @@ vi.mock('@/lib/api', async () => {
     removeFavoriteResource: apiMocks.removeFavoriteResource,
   }
 })
+
+vi.mock('@/hooks/use-cluster', () => ({
+  useCluster: () => ({
+    currentCluster: currentClusterMock,
+  }),
+}))
 
 const favorite: SearchResult = {
   id: 'resource-1',
@@ -50,8 +57,7 @@ function createQueryWrapper() {
 describe('useFavorites', () => {
   beforeEach(() => {
     favoritesStore.length = 0
-    localStorage.clear()
-    localStorage.setItem('current-cluster', 'cluster-a')
+    currentClusterMock = 'cluster-a'
     vi.restoreAllMocks()
 
     apiMocks.listFavoriteResources.mockImplementation(async () => [...favoritesStore])

@@ -112,6 +112,7 @@
     "cronjobs": "定时任务",
     "storageclasses": "存储类",
     "events": "事件",
+    "favorites": "收藏",
     "crds": "自定义资源定义",
     "kubectl": "Kubectl 终端",
     "settings": "设置",
@@ -166,6 +167,24 @@
     "resourceCharts": "资源图表",
     "failedToLoad": "加载概览数据失败",
     "unknownError": "发生未知错误"
+  },
+  "favorites": {
+    "title": "收藏",
+    "currentCluster": "当前集群：{{name}}",
+    "searchPlaceholder": "搜索收藏资源...",
+    "searchAriaLabel": "搜索收藏资源",
+    "allTypes": "全部类型",
+    "allNamespaces": "全部命名空间",
+    "typeFilterAriaLabel": "按资源类型筛选收藏",
+    "namespaceFilterAriaLabel": "按命名空间筛选收藏",
+    "count": "{{count}} / {{total}} 个收藏",
+    "remove": "取消收藏",
+    "emptyTitle": "当前集群还没有收藏资源",
+    "emptyDescription": "可以在资源搜索中点击星标，把常用资源加入收藏",
+    "openSearch": "打开资源搜索",
+    "emptyFilteredTitle": "没有符合当前筛选条件的收藏",
+    "emptyFilteredDescription": "试试调整搜索词、资源类型或命名空间筛选条件",
+    "clearFilters": "清空筛选"
   },
   "pods": {
     "title": "Pods",

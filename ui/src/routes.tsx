@@ -4,6 +4,7 @@ import App, { StandaloneAIChatApp } from './App'
 import { getSubPath } from './lib/subpath'
 import { AdvancedNetworkingPage } from './pages/advanced-networking'
 import { CRListPage } from './pages/cr-list-page'
+import { FavoritesPage } from './pages/favorites'
 import { Overview } from './pages/overview'
 import { ResourceDetail } from './pages/resource-detail'
 import { ResourceList } from './pages/resource-list'
@@ -48,6 +49,10 @@ export const router = createBrowserRouter(
         {
           path: 'crds/:resource/:name',
           element: <ResourceDetail />,
+        },
+        {
+          path: 'favorites',
+          element: <FavoritesPage />,
         },
         {
           path: ':resource/:name',

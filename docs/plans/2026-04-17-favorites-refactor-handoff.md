@@ -71,6 +71,24 @@
   - `resourceName`
 - 不再依赖搜索结果 `id`
 
+### 2.3 收藏页
+
+已新增独立收藏页：
+
+- 路由：`/favorites`
+- 位置：左侧导航 `集群` 分组末尾
+- 范围：只展示当前集群收藏
+
+当前页面能力：
+
+- 展示当前集群收藏列表
+- 当前集群切换后页面内容同步切换
+- 支持本地搜索
+- 支持按资源类型筛选
+- 支持按命名空间筛选
+- 支持点击进入资源详情
+- 支持在页面内取消收藏
+
 ## 3. 已经确认通过的验证
 
 已执行并通过：
@@ -152,9 +170,12 @@
 1. 手动验证以下交互：
    - 搜索弹窗打开
    - 点击星标收藏
-   - 关闭再打开搜索弹窗
    - 切换集群后收藏隔离
+   - 收藏页筛选与跳转
 2. 如果未来推进“去用户化”改造，再评估是否把收藏从本地桌面用户模型中迁出
+3. 如果后续收藏数量继续增大，可再评估：
+   - 搜索弹窗收藏区展示数量上限
+   - 收藏页分组或排序增强
 
 ## 8. 调试补充
 
@@ -180,7 +201,11 @@
 - `ui/src/hooks/use-favorites.ts`
 - `ui/src/hooks/use-favorites.test.tsx`
 - `ui/src/components/global-search.tsx`
+- `ui/src/pages/favorites.tsx`
+- `ui/src/pages/favorites.test.tsx`
 - `ui/src/lib/favorites.ts`
+- `ui/src/routes.tsx`
+- `ui/src/contexts/sidebar-config-context.tsx`
 
 与本次并行整理但不直接属于收藏逻辑的文档类变更：
 
@@ -188,6 +213,7 @@
 - `.codex/README.md`
 - `.codex/project-context.md`
 - `.codex/development-guide.md`
+- `docs/plans/2026-04-18-favorites-page-design.md`
 
 ## 10. 当前状态总结
 
@@ -199,6 +225,7 @@
 - 收藏主存储切换到 SQLite
 - 前后端接口全部接通
 - 搜索弹窗星标逻辑切到自然键判断
+- 当前集群收藏页已落地
 - 旧 `localStorage` 收藏逻辑已从主流程移除
 - handler 请求语义、主流程测试都已补齐
 

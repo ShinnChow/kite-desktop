@@ -9,6 +9,7 @@ import {
   SearchResult,
 } from '@/lib/api'
 import { buildFavoriteKeyFromResource } from '@/lib/favorites'
+import { useCluster } from '@/hooks/use-cluster'
 
 function favoriteToSearchResult(favorite: FavoriteResource): SearchResult {
   return {
@@ -34,7 +35,7 @@ function toFavoriteRequest(resource: SearchResult) {
 
 export function useFavorites() {
   const queryClient = useQueryClient()
-  const currentCluster = localStorage.getItem('current-cluster') || ''
+  const { currentCluster } = useCluster()
   const queryKey = ['favorites', currentCluster] as const
 
   const favoritesQuery = useQuery({

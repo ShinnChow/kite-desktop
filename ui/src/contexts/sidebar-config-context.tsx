@@ -31,6 +31,7 @@ import {
   IconShield,
   IconShieldCheck,
   IconStack2,
+  IconStar,
   IconTopologyBus,
   IconUser,
   IconUsers,
@@ -72,6 +73,7 @@ const iconMap = {
   IconBell,
   IconCode,
   IconArrowsHorizontal,
+  IconStar,
 }
 
 const getIconName = (iconComponent: React.ComponentType): string => {
@@ -130,6 +132,7 @@ const defaultMenus: DefaultMenus = {
       icon: IconBoxMultiple,
     },
     { titleKey: 'nav.events', url: '/events', icon: IconBell },
+    { titleKey: 'nav.favorites', url: '/favorites', icon: IconStar },
   ],
   'sidebar.groups.workloads': [
     { titleKey: 'nav.deployments', url: '/deployments', icon: IconRocket },
@@ -206,7 +209,7 @@ const defaultMenus: DefaultMenus = {
   ],
 }
 
-const CURRENT_CONFIG_VERSION = 3
+const CURRENT_CONFIG_VERSION = 4
 const SIDEBAR_CONFIG_STORAGE_KEY = 'desktop-sidebar-config'
 const DEFAULT_COLLAPSED_GROUP_IDS = new Set([
   'sidebar-groups-security',

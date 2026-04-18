@@ -120,6 +120,7 @@
     "cronjobs": "Cron Jobs",
     "storageclasses": "Storage Classes",
     "events": "Events",
+    "favorites": "Favorites",
     "crds": "CRDs",
     "kubectl": "Kubectl Terminal",
     "serviceaccounts": "Service Accounts",
@@ -139,6 +140,24 @@
     "resourceCharts": "Resource Charts",
     "failedToLoad": "Failed to load overview data",
     "unknownError": "Unknown error occurred"
+  },
+  "favorites": {
+    "title": "Favorites",
+    "currentCluster": "Current cluster: {{name}}",
+    "searchPlaceholder": "Search favorite resources...",
+    "searchAriaLabel": "Search favorite resources",
+    "allTypes": "All types",
+    "allNamespaces": "All namespaces",
+    "typeFilterAriaLabel": "Filter favorites by resource type",
+    "namespaceFilterAriaLabel": "Filter favorites by namespace",
+    "count": "Showing {{count}} of {{total}} favorites",
+    "remove": "Remove favorite",
+    "emptyTitle": "No favorites in the current cluster yet",
+    "emptyDescription": "Use the resource search star button to save common resources here",
+    "openSearch": "Open resource search",
+    "emptyFilteredTitle": "No favorites match the current filters",
+    "emptyFilteredDescription": "Try adjusting the keyword, resource type, or namespace filters",
+    "clearFilters": "Clear filters"
   },
   "pods": {
     "title": "Pods",
