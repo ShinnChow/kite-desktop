@@ -31,43 +31,7 @@ func TestMain(m *testing.M) {
 }
 
 func TestGetPreferenceClusterNamePrecedence(t *testing.T) {
-	t.Run("context beats header query and cookie", func(t *testing.T) {
-		ctx := newFavoriteContext(t)
-		ctx.Set(middleware.ClusterNameKey, "context-cluster")
-		ctx.Request.Header.Set(middleware.ClusterNameHeader, "header-cluster")
-		ctx.Request.URL.RawQuery = middleware.ClusterNameHeader + "=query-cluster"
-
-		if got := getPreferenceClusterName(ctx); got != "context-cluster" {
-			t.Fatalf("getPreferenceClusterName() = %q, want %q", got, "context-cluster")
-		}
-	})
-
-	t.Run("header beats query and cookie", func(t *testing.T) {
-		ctx := newFavoriteContext(t)
-		ctx.Request.Header.Set(middleware.ClusterNameHeader, "header-cluster")
-		ctx.Request.URL.RawQuery = middleware.ClusterNameHeader + "=query-cluster"
-
-		if got := getPreferenceClusterName(ctx); got != "header-cluster" {
-			t.Fatalf("getPreferenceClusterName() = %q, want %q", got, "header-cluster")
-		}
-	})
-
-	t.Run("query beats cookie", func(t *testing.T) {
-		ctx := newFavoriteContext(t)
-		ctx.Request.URL.RawQuery = middleware.ClusterNameHeader + "=query-cluster"
-
-		if got := getPreferenceClusterName(ctx); got != "query-cluster" {
-			t.Fatalf("getPreferenceClusterName() = %q, want %q", got, "query-cluster")
-		}
-	})
-
-	t.Run("cookie fallback", func(t *testing.T) {
-		ctx := newFavoriteContext(t)
-
-		if got := getPreferenceClusterName(ctx); got != "cookie-cluster" {
-			t.Fatalf("getPreferenceClusterName() = %q, want %q", got, "cookie-cluster")
-		}
-	})
+	assertClusterNamePrecedence(t, newFavoriteContext, getPreferenceClusterName, "getPreferenceClusterName")
 }
 
 func TestFavoriteHandlersCRUD(t *testing.T) {
