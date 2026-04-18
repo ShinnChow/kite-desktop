@@ -3,9 +3,9 @@ version = 1
 name = "kite-desktop"
 
 [setup]
-script = "make dev"
+script = ""
 
 [[actions]]
-name = "dev"
+name = "运行"
 icon = "run"
-command = "make dev"
+script = "make dev"
