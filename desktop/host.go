@@ -1117,7 +1117,13 @@ func desktopWindowOptions(opts application.WebviewWindowOptions) application.Web
 }
 
 func desktopDevMode() bool {
-	return os.Getenv("DEV") == "true"
+	if os.Getenv("DEV") == "true" {
+		return true
+	}
+
+	// `wails3 dev` injects the frontend dev server URL even when the app
+	// process itself was not launched with an explicit DEV=true runtime env.
+	return strings.TrimSpace(os.Getenv("FRONTEND_DEVSERVER_URL")) != ""
 }
 
 func appRoute(route string) string {

@@ -49,7 +49,6 @@
 - `GET /api/v1/preferences/favorites`
 - `POST /api/v1/preferences/favorites`
 - `POST /api/v1/preferences/favorites/remove`
-- `POST /api/v1/preferences/favorites/import`
 
 ### 2.2 前端
 
@@ -76,16 +75,16 @@
 
 已执行并通过：
 
-- `go test ./pkg/model ./internal/server`
+- `go test ./pkg/model ./internal/server ./pkg/handlers`
 - `go test ./...`
-- `pnpm --dir ui exec vitest run src/hooks/use-favorites.test.tsx`
-- `pnpm --dir ui run type-check`
+- `pnpm --dir ui test -- --run src/lib/favorites.test.ts src/hooks/use-favorites.test.tsx src/components/global-search.test.tsx`
+- `pnpm --dir ui exec tsc --noEmit`
 
 ## 4. 遇到过的问题
 
-### 4.1 自动迁移旧收藏时，页面进入 React 运行时异常
+### 4.1 曾经尝试过兼容旧 `localStorage` 收藏，但已不再保留
 
-曾经实现过“自动把旧 `localStorage` 收藏迁移到 SQLite”的逻辑。
+之前一度实现过“自动把旧 `localStorage` 收藏迁移到 SQLite”的逻辑。
 
 问题表现：
 
@@ -104,36 +103,36 @@
 - 自动迁移过程中，query + mutation + 状态更新形成了不稳定的渲染链
 - 即使测试没稳定复现，运行时在 Wails dev 环境里仍可能触发异常
 
-## 5. 当前采取的临时处理
+## 5. 当前采取的处理
 
-为了先恢复页面稳定性，已经做了以下处理：
+考虑到当前项目还处于初期阶段、历史用户数据几乎可以忽略，当前版本已经做了以下处理：
 
-- 已完全移除 `useFavorites` 中的自动迁移逻辑
-- 当前版本只保留 SQLite 收藏主逻辑
-- 旧 `localStorage` 收藏暂时不会被自动导入
+- 保留 SQLite 作为收藏主存储
+- 已完全移除旧 `localStorage` 收藏迁移逻辑
+- 已删除仅用于迁移的 `/preferences/favorites/import` 接口
+- `ui/src/lib/favorites.ts` 只保留自然键相关工具函数
 
 也就是说，当前状态是：
 
 - 收藏读写已经走 SQLite
-- 旧收藏迁移功能暂时关闭
+- 不再尝试读取、迁移或兼容旧 `localStorage` 收藏数据
+- 收藏主流程中已经没有 legacy `localStorage` 依赖
 
 ## 6. 当前已知的未完成项
 
-### 6.1 旧收藏迁移策略还没有最终落地
+### 6.1 旧收藏兼容路径已移除
 
-目前只是保留了旧收藏相关工具函数：
+当前不再保留这些旧收藏迁移能力：
 
-- `getLegacyFavorites`
-- `hasFavoritesMigrationMarker`
-- `markFavoritesMigrated`
+- 旧 `localStorage` 收藏自动迁移
+- migration marker
+- 导入接口 `/api/v1/preferences/favorites/import`
 
-但它们现在没有被主流程调用。
+这是一个有意的产品取舍，而不是漏做：
 
-后续如果要继续迁移旧收藏，建议不要再走“页面加载自动迁移”的方式，优先考虑：
-
-1. 手动迁移按钮
-2. 设置页显式触发迁移
-3. 更保守的一次性后台迁移，并先做错误隔离
+1. 当前项目还处于初期
+2. 旧收藏历史包袱很小
+3. 简化主流程比兼容极少量历史数据更重要
 
 ### 6.2 仍然挂靠在本地桌面用户模型上
 
@@ -150,14 +149,12 @@
 
 如果下次继续做收藏功能，建议按这个顺序推进：
 
-1. 先确认当前版本在 `make dev` 下页面已恢复正常
-2. 手动验证以下交互：
+1. 手动验证以下交互：
    - 搜索弹窗打开
    - 点击星标收藏
    - 关闭再打开搜索弹窗
    - 切换集群后收藏隔离
-3. 如果基本可用，再决定是否恢复“旧收藏迁移”
-4. 如果恢复迁移，优先做成手动触发方案，而不是自动触发
+2. 如果未来推进“去用户化”改造，再评估是否把收藏从本地桌面用户模型中迁出
 
 ## 8. 调试补充
 
@@ -194,13 +191,15 @@
 
 ## 10. 当前状态总结
 
-当前收藏改造处于“主存储切到 SQLite，但迁移逻辑暂时回退”的状态。
+当前收藏改造已经进入“SQLite 主存储、无旧收藏兼容路径”的状态。
 
-这是一个可接受的中间态：
+目前已落地的内容包括：
 
-- 方向是对的
-- 主体代码已经落下去了
-- 测试也通过了
-- 但页面稳定性曾被自动迁移逻辑影响
+- 收藏主键从资源 `UID` 切到自然键
+- 收藏主存储切换到 SQLite
+- 前后端接口全部接通
+- 搜索弹窗星标逻辑切到自然键判断
+- 旧 `localStorage` 收藏逻辑已从主流程移除
+- handler 请求语义、主流程测试都已补齐
 
-因此当前最重要的不是继续扩功能，而是先确认桌面 dev 运行时已经恢复稳定，再决定是否继续补旧收藏迁移。
+当前剩余的主要工作已经不是旧逻辑兼容，而是继续围绕桌面端真实使用场景完善收藏体验本身。

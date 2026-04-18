@@ -37,6 +37,9 @@ func registerBaseRoutes(r *gin.RouterGroup) {
 
 func registerDesktopPreferenceRoutes(r *gin.RouterGroup) {
 	preferenceAPI := r.Group("/api/v1/preferences")
+	preferenceAPI.GET("/favorites", handlers.GetFavoriteResources)
+	preferenceAPI.POST("/favorites", handlers.SaveFavoriteResource)
+	preferenceAPI.POST("/favorites/remove", handlers.RemoveFavoriteResource)
 	preferenceAPI.GET("/sidebar", handlers.GetSidebarPreference)
 	preferenceAPI.PUT("/sidebar", handlers.SaveSidebarPreference)
 }

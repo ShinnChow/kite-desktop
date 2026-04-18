@@ -453,20 +453,12 @@ export function GlobalSearch({ open, mode, onOpenChange }: GlobalSearchProps) {
 
   // Handle favorite toggle
   const toggleFavorite = useCallback(
-    (result: SearchResult, event: React.MouseEvent) => {
+    async (result: SearchResult, event: React.MouseEvent) => {
       event.stopPropagation() // Prevent item selection
 
-      toggleResourceFavorite(result)
-
-      // Refresh results to update favorite status if showing favorites
-      const currentQuery = query
-      setTimeout(() => {
-        if (!currentQuery || currentQuery.length < 2) {
-          setResults(favorites)
-        }
-      }, 0)
+      await toggleResourceFavorite(result)
     },
-    [query, toggleResourceFavorite, favorites]
+    [toggleResourceFavorite]
   )
 
   // Debounced search function
@@ -735,7 +727,7 @@ export function GlobalSearch({ open, mode, onOpenChange }: GlobalSearchProps) {
                     icon: IconBox, // Default icon if not found
                   }
                   const Icon = config.icon
-                  const isFav = isFavorite(result.id)
+                  const isFav = isFavorite(result)
                   const path = result.namespace
                     ? `/${result.resourceType}/${result.namespace}/${result.name}`
                     : `/${result.resourceType}/${result.name}`
@@ -772,7 +764,7 @@ export function GlobalSearch({ open, mode, onOpenChange }: GlobalSearchProps) {
                         onClick={(e) => {
                           e.preventDefault()
                           e.stopPropagation()
-                          toggleFavorite(result, e)
+                          void toggleFavorite(result, e)
                         }}
                         className="p-1 hover:bg-accent rounded transition-colors z-10 relative"
                       >
