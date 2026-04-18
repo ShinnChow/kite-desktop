@@ -1,5 +1,13 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+const { trackEvent } = vi.hoisted(() => ({
+  trackEvent: vi.fn(),
+}))
+
+vi.mock('@/lib/analytics', () => ({
+  trackEvent,
+}))
 
 import { TerminalProvider, useTerminal } from './terminal-context'
 
@@ -42,7 +50,7 @@ function TerminalConsumer() {
       <span data-testid="state">
         {isOpen ? 'open' : 'closed'}/{isMinimized ? 'minimized' : 'expanded'}
       </span>
-      <button type="button" onClick={openTerminal}>
+      <button type="button" onClick={() => openTerminal()}>
         open
       </button>
       <button type="button" onClick={closeTerminal}>
@@ -51,7 +59,7 @@ function TerminalConsumer() {
       <button type="button" onClick={minimizeTerminal}>
         minimize
       </button>
-      <button type="button" onClick={toggleTerminal}>
+      <button type="button" onClick={() => toggleTerminal()}>
         toggle
       </button>
     </div>
@@ -59,6 +67,10 @@ function TerminalConsumer() {
 }
 
 describe('TerminalProvider', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
   it('drives the terminal state through its public actions', async () => {
     render(
       <TerminalProvider>
@@ -72,16 +84,23 @@ describe('TerminalProvider', () => {
     await waitFor(() => {
       expect(screen.getByTestId('state')).toHaveTextContent('open/expanded')
     })
+    expect(trackEvent).toHaveBeenCalledWith('kubectl_terminal_open', {
+      runtime: 'desktop',
+      entry: 'button',
+      page: 'overview',
+    })
 
     fireEvent.click(screen.getByRole('button', { name: 'toggle' }))
     await waitFor(() => {
       expect(screen.getByTestId('state')).toHaveTextContent('open/minimized')
     })
+    expect(trackEvent).toHaveBeenCalledTimes(1)
 
     fireEvent.click(screen.getByRole('button', { name: 'toggle' }))
     await waitFor(() => {
       expect(screen.getByTestId('state')).toHaveTextContent('open/expanded')
     })
+    expect(trackEvent).toHaveBeenCalledTimes(1)
 
     fireEvent.click(screen.getByRole('button', { name: 'close' }))
     await waitFor(() => {

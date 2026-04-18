@@ -92,6 +92,12 @@ The project will primarily be delivered as desktop installation packages, with g
 - Windows x64
 - Windows ARM64
 
+## Analytics Privacy
+
+If you need the privacy notice for desktop analytics, see:
+
+- [Desktop Analytics Privacy Notice](./docs/desktop-analytics-privacy-notice.md)
+
 ## License
 
 This repository is licensed under `AGPL-3.0-only`. See [LICENSE](./LICENSE) for details.

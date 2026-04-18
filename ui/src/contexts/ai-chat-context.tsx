@@ -11,6 +11,8 @@ import { useRuntime } from '@/contexts/runtime-context'
 import { useLocation, useParams } from 'react-router-dom'
 
 import { useAIStatus, useGeneralSetting } from '@/lib/api'
+import { trackEvent } from '@/lib/analytics'
+import { getAnalyticsPageKey } from '@/lib/analytics-route'
 import {
   closeAIChatSidecar,
   openAIChatSidecar,
@@ -113,6 +115,14 @@ function persistAIChatSidecarPageContext(
     getAIChatSidecarPageContextStorageKey(clusterName),
     JSON.stringify(normalizePageContext(pageContext))
   )
+}
+
+function trackAIChatOpen(entry: string, pathname: string) {
+  trackEvent('ai_chat_open', {
+    runtime: 'desktop',
+    entry,
+    page: getAnalyticsPageKey(pathname),
+  })
 }
 
 export function AIChatProvider({ children }: { children: ReactNode }) {
@@ -262,12 +272,13 @@ export function AIChatProvider({ children }: { children: ReactNode }) {
     if (!isAvailable) {
       return
     }
+    trackAIChatOpen('button', location.pathname)
     if (aiChatOpenMode === 'sidecar') {
       void openAIChatSidecar({ pageContext })
       return
     }
     setIsOpen(true)
-  }, [aiChatOpenMode, isAvailable, pageContext])
+  }, [aiChatOpenMode, isAvailable, location.pathname, pageContext])
 
   const closeChat = useCallback(() => {
     if (aiChatOpenMode === 'sidecar') {
@@ -284,8 +295,11 @@ export function AIChatProvider({ children }: { children: ReactNode }) {
       void toggleAIChatSidecar({ pageContext })
       return
     }
+    if (!isOpen) {
+      trackAIChatOpen('shortcut', location.pathname)
+    }
     setIsOpen((prev) => !prev)
-  }, [aiChatOpenMode, isAvailable, pageContext])
+  }, [aiChatOpenMode, isAvailable, isOpen, location.pathname, pageContext])
 
   useEffect(() => {
     if (isAvailable) {
@@ -321,7 +335,12 @@ export function AIChatProvider({ children }: { children: ReactNode }) {
           void toggleAIChatSidecar({ pageContext })
           return
         }
-        setIsOpen((prev) => !prev)
+        setIsOpen((prev) => {
+          if (!prev) {
+            trackAIChatOpen('shortcut', location.pathname)
+          }
+          return !prev
+        })
       }
     }
 
@@ -330,7 +349,12 @@ export function AIChatProvider({ children }: { children: ReactNode }) {
         void toggleAIChatSidecar({ pageContext })
         return
       }
-      setIsOpen((prev) => !prev)
+      setIsOpen((prev) => {
+        if (!prev) {
+          trackAIChatOpen('shortcut', location.pathname)
+        }
+        return !prev
+      })
     }
 
     document.addEventListener('keydown', handleKeyDown)
@@ -340,7 +364,13 @@ export function AIChatProvider({ children }: { children: ReactNode }) {
       document.removeEventListener('keydown', handleKeyDown)
       window.removeEventListener(AI_CHAT_TOGGLE_EVENT, handleToggle)
     }
-  }, [aiChatOpenMode, canHandleSidecarShortcut, isAvailable, pageContext])
+  }, [
+    aiChatOpenMode,
+    canHandleSidecarShortcut,
+    isAvailable,
+    location.pathname,
+    pageContext,
+  ])
 
   return (
     <AIChatContext.Provider

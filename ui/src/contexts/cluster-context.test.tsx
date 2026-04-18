@@ -1,6 +1,15 @@
 import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+const { trackEvent } = vi.hoisted(() => ({
+  trackEvent: vi.fn(),
+}))
+
+vi.mock('@/lib/analytics', () => ({
+  trackEvent,
+}))
 
 import { ClusterProvider, ClusterContext } from './cluster-context'
 
@@ -11,6 +20,21 @@ function ClusterStateProbe() {
         <div data-testid="cluster-state">
           {value?.currentCluster ?? 'none'}|{String(value?.isLoading)}
         </div>
+      )}
+    </ClusterContext.Consumer>
+  )
+}
+
+function ClusterSwitchProbe() {
+  return (
+    <ClusterContext.Consumer>
+      {(value) => (
+        <button
+          type="button"
+          onClick={() => value?.setCurrentCluster('cluster-b')}
+        >
+          switch
+        </button>
       )}
     </ClusterContext.Consumer>
   )
@@ -29,12 +53,17 @@ function renderClusterProvider() {
     <QueryClientProvider client={queryClient}>
       <ClusterProvider>
         <ClusterStateProbe />
+        <ClusterSwitchProbe />
       </ClusterProvider>
     </QueryClientProvider>
   )
 }
 
 describe('ClusterProvider', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
   it('clears stale cluster state and does not auto-select when clusters are empty', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
@@ -57,6 +86,38 @@ describe('ClusterProvider', () => {
     expect(setItemSpy).not.toHaveBeenCalledWith(
       'current-cluster',
       expect.any(String)
+    )
+  })
+
+  it('tracks a sanitized cluster switch event without leaking the cluster name', async () => {
+    const user = userEvent.setup()
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => [
+        { name: 'cluster-a', isDefault: true },
+        { name: 'cluster-b', isDefault: false },
+      ],
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderClusterProvider()
+
+    await waitFor(() =>
+      expect(screen.getByTestId('cluster-state')).toHaveTextContent(
+        'cluster-a|false'
+      )
+    )
+
+    await user.click(screen.getByRole('button', { name: 'switch' }))
+
+    expect(trackEvent).toHaveBeenCalledWith('cluster_switch', {
+      runtime: 'desktop',
+      page: 'overview',
+    })
+    expect(trackEvent).not.toHaveBeenCalledWith(
+      'cluster_switch',
+      expect.objectContaining({ clusterName: 'cluster-b' })
     )
   })
 })

@@ -44,7 +44,11 @@ func setupStatic(r *gin.Engine) {
 			return
 		}
 
-		htmlContent := utils.InjectKiteBase(string(content), base)
+		htmlContent := utils.InjectKiteBase(
+			string(content),
+			base,
+			common.EnableAnalytics,
+		)
 		if common.EnableAnalytics {
 			htmlContent = utils.InjectAnalytics(htmlContent)
 		}

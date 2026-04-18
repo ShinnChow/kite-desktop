@@ -1,4 +1,6 @@
 import { withSubPath } from './subpath'
+import { trackEvent } from './analytics'
+import { getCurrentAnalyticsPageKey } from './analytics-route'
 
 export const DESKTOP_LOCAL_RUNTIME = 'desktop-local'
 
@@ -325,7 +327,17 @@ export async function copyTextToClipboard(text: string): Promise<void> {
 }
 
 export async function importKubeconfig(content?: string): Promise<boolean> {
-  return invokeDesktopAction('/api/desktop/import-kubeconfig', { content })
+  const imported = await invokeDesktopAction('/api/desktop/import-kubeconfig', {
+    content,
+  })
+  if (imported) {
+    trackEvent('kubeconfig_import', {
+      runtime: 'desktop',
+      mode: content?.trim() ? 'text_import' : 'file_dialog',
+      page: getCurrentAnalyticsPageKey(),
+    })
+  }
+  return imported
 }
 
 export async function getDesktopAppInfo(): Promise<DesktopAppInfo | null> {

@@ -46,7 +46,7 @@ type GeneralSetting struct {
 	KubectlEnabled            bool         `json:"kubectlEnabled" gorm:"column:kubectl_enabled;type:boolean;not null;default:true"`
 	KubectlImage              string       `json:"kubectlImage" gorm:"column:kubectl_image;type:varchar(255);not null;default:'docker.cnb.cool/znb/images/kubectl:latest'"`
 	NodeTerminalImage         string       `json:"nodeTerminalImage" gorm:"column:node_terminal_image;type:varchar(255);not null;default:'docker.cnb.cool/znb/images/busybox:latest'"`
-	EnableAnalytics           bool         `json:"enableAnalytics" gorm:"column:enable_analytics;type:boolean;not null;default:true"`
+	EnableAnalytics           bool         `json:"enableAnalytics" gorm:"column:enable_analytics;type:boolean;not null;default:false"`
 	EnableVersionCheck        bool         `json:"enableVersionCheck" gorm:"column:enable_version_check;type:boolean;not null;default:true"`
 	JWTSecret                 SecretString `json:"-" gorm:"column:jwt_secret;type:text"`
 	GlobalSidebarPreference   string       `json:"-" gorm:"column:global_sidebar_preference;type:text"`

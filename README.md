@@ -92,6 +92,12 @@ make build
 - Windows x64
 - Windows ARM64
 
+## 数据分析与隐私文档
+
+如果你需要查看桌面版应用数据分析隐私说明，可参考以下文档：
+
+- [应用数据分析隐私协议](./docs/desktop-analytics-privacy-notice.md)
+
 ## 许可证
 
 本仓库使用 `AGPL-3.0-only`，详见 [LICENSE](./LICENSE)。

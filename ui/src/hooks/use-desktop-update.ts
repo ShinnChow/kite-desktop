@@ -3,6 +3,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 
 import { checkVersionUpdate, type UpdateCheckInfo } from '@/lib/api'
+import { trackEvent } from '@/lib/analytics'
+import { getCurrentAnalyticsPageKey } from '@/lib/analytics-route'
 import {
   applyDesktopUpdate,
   cancelDesktopUpdateDownload,
@@ -53,6 +55,16 @@ async function readDesktopUpdateState(): Promise<DesktopUpdateStateData> {
 export function useDesktopUpdate() {
   const { isDesktop, isReady } = useRuntime()
   const queryClient = useQueryClient()
+
+  const trackDesktopUpdateEvent = (name: string) => {
+    if (!isDesktop) {
+      return
+    }
+    trackEvent(name, {
+      runtime: 'desktop',
+      page: getCurrentAnalyticsPageKey(),
+    })
+  }
 
   const showMutationError = (error: unknown) => {
     toast.error(
@@ -183,14 +195,25 @@ export function useDesktopUpdate() {
     isRetryingDownload: retryDownloadMutation.isPending,
     isCancellingDownload: cancelDownloadMutation.isPending,
     isApplyingUpdate: applyUpdateMutation.isPending,
-    check: (force: boolean = true) => checkMutation.mutate(force),
+    check: (force: boolean = true) => {
+      if (force) {
+        trackDesktopUpdateEvent('update_check_clicked')
+      }
+      checkMutation.mutate(force)
+    },
     checkAsync: (force: boolean = true) => checkMutation.mutateAsync(force),
     ignore: (version: string) => ignoreMutation.mutate(version),
     clearIgnore: () => clearIgnoreMutation.mutate(),
-    startDownload: (version: string) => startDownloadMutation.mutate(version),
+    startDownload: (version: string) => {
+      trackDesktopUpdateEvent('update_download_started')
+      startDownloadMutation.mutate(version)
+    },
     retryDownload: () => retryDownloadMutation.mutate(),
     cancelDownload: () => cancelDownloadMutation.mutate(),
-    applyUpdate: () => applyUpdateMutation.mutate(),
+    applyUpdate: () => {
+      trackDesktopUpdateEvent('update_install_started')
+      applyUpdateMutation.mutate()
+    },
     refreshState,
     isIgnoring: ignoreMutation.isPending,
     isClearingIgnore: clearIgnoreMutation.isPending,

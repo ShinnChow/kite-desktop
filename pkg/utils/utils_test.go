@@ -12,7 +12,7 @@ func TestInjectKiteBase(t *testing.T) {
 	html := `<html><head><link rel="modulepreload" href="__KITE_BASE__/assets/index.js"><script type="module" src="__KITE_BASE__/assets/main.js"></script></head></html>`
 
 	t.Run("subpath", func(t *testing.T) {
-		got := InjectKiteBase(html, "/kite")
+		got := InjectKiteBase(html, "/kite", true)
 
 		if strings.Contains(got, "__KITE_BASE__") {
 			t.Fatalf("placeholder should be replaced: %s", got)
@@ -26,13 +26,13 @@ func TestInjectKiteBase(t *testing.T) {
 		if !strings.Contains(got, `src="/kite/assets/main.js"`) {
 			t.Fatalf("expected asset src to include subpath: %s", got)
 		}
-		if !strings.Contains(got, `<script>window.__dynamic_base__="/kite";</script>`) {
+		if !strings.Contains(got, `<script>window.__dynamic_base__="/kite";window.__kite_analytics_enabled__=true;</script>`) {
 			t.Fatalf("expected runtime base script: %s", got)
 		}
 	})
 
 	t.Run("root", func(t *testing.T) {
-		got := InjectKiteBase(html, "")
+		got := InjectKiteBase(html, "", false)
 
 		if !strings.Contains(got, `href="/assets/index.js"`) {
 			t.Fatalf("expected root asset href: %s", got)
@@ -40,13 +40,13 @@ func TestInjectKiteBase(t *testing.T) {
 		if !strings.Contains(got, `src="/assets/main.js"`) {
 			t.Fatalf("expected root asset src: %s", got)
 		}
-		if !strings.Contains(got, `<script>window.__dynamic_base__="";</script>`) {
+		if !strings.Contains(got, `<script>window.__dynamic_base__="";window.__kite_analytics_enabled__=false;</script>`) {
 			t.Fatalf("expected empty runtime base script: %s", got)
 		}
 	})
 
 	t.Run("escapes html attribute injection", func(t *testing.T) {
-		got := InjectKiteBase(html, `/ki"te`)
+		got := InjectKiteBase(html, `/ki"te`, true)
 
 		if strings.Contains(got, `href="/ki"te/assets/index.js"`) {
 			t.Fatalf("expected asset href to be escaped: %s", got)
@@ -54,7 +54,7 @@ func TestInjectKiteBase(t *testing.T) {
 		if !strings.Contains(got, `href="/ki&#34;te/assets/index.js"`) {
 			t.Fatalf("expected escaped quote in asset href: %s", got)
 		}
-		if !strings.Contains(got, `<script>window.__dynamic_base__="/ki\"te";</script>`) {
+		if !strings.Contains(got, `<script>window.__dynamic_base__="/ki\"te";window.__kite_analytics_enabled__=true;</script>`) {
 			t.Fatalf("expected runtime base script to remain safely quoted: %s", got)
 		}
 	})
@@ -64,11 +64,27 @@ func TestInjectAnalytics(t *testing.T) {
 	html := `<html><head><title>kite</title></head><body></body></html>`
 
 	got := InjectAnalytics(html)
-	if !strings.Contains(got, `https://cloud.umami.is/script.js`) {
+	if !strings.Contains(got, `https://umami.eryajf.net/script.js`) {
 		t.Fatalf("expected analytics script to be injected: %s", got)
 	}
-	if strings.Index(got, `https://cloud.umami.is/script.js`) > strings.Index(got, `</head>`) {
-		t.Fatalf("expected analytics script before </head>: %s", got)
+	if !strings.Contains(got, `data-website-id="8317012e-c8ab-4b59-bc86-2e708ceac202"`) {
+		t.Fatalf("expected analytics website id to be injected: %s", got)
+	}
+	for _, attr := range []string{
+		`data-auto-track="false"`,
+		`data-tag="desktop"`,
+		`data-domains="127.0.0.1,localhost"`,
+		`data-exclude-search="true"`,
+		`data-exclude-hash="true"`,
+		`data-do-not-track="true"`,
+	} {
+		if !strings.Contains(got, attr) {
+			t.Fatalf("expected analytics script to contain %s: %s", attr, got)
+		}
+	}
+	if strings.Index(got, `https://umami.eryajf.net/script.js`) > strings.Index(got, `__KITE_BASE__`) &&
+		strings.Contains(got, `__KITE_BASE__`) {
+		t.Fatalf("expected analytics script before app asset scripts: %s", got)
 	}
 
 	if unchanged := InjectAnalytics("<html><body></body></html>"); unchanged != "<html><body></body></html>" {

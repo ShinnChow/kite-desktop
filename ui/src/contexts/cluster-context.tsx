@@ -3,6 +3,8 @@ import React, { createContext, useEffect, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 
+import { trackEvent } from '@/lib/analytics'
+import { getCurrentAnalyticsPageKey } from '@/lib/analytics-route'
 import { Cluster } from '@/types/api'
 import { clusterQueryKey } from '@/lib/cluster-query'
 import { withSubPath } from '@/lib/subpath'
@@ -130,6 +132,10 @@ export const ClusterProvider: React.FC<{ children: React.ReactNode }> = ({
         localStorage.setItem('current-cluster', clusterName)
         saveRecentCluster(clusterName)
         document.cookie = `x-cluster-name=${clusterName}; path=/`
+        trackEvent('cluster_switch', {
+          runtime: 'desktop',
+          page: getCurrentAnalyticsPageKey(),
+        })
         setTimeout(async () => {
           await queryClient.invalidateQueries({
             predicate: (query) => {

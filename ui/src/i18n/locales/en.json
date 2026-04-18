@@ -511,7 +511,7 @@
     },
     "runtime": {
       "title": "Runtime",
-      "description": "Configure analytics and version checking behavior.",
+      "description": "Configure usage analytics and version checking. Turning off analytics does not disable version checks.",
       "form": {
         "enableAnalytics": "Enable analytics",
         "enableVersionCheck": "Enable version check"

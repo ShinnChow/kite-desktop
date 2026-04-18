@@ -137,8 +137,17 @@ func TestSetupStatic(t *testing.T) {
 		if !strings.Contains(body, `window.__dynamic_base__="/kite"`) {
 			t.Fatalf("body missing dynamic base injection")
 		}
-		if !strings.Contains(body, "cloud.umami.is/script.js") {
+		if !strings.Contains(body, `window.__kite_analytics_enabled__=true`) {
+			t.Fatalf("body missing analytics runtime flag")
+		}
+		if !strings.Contains(body, "umami.eryajf.net/script.js") {
 			t.Fatalf("body missing analytics injection")
+		}
+		if !strings.Contains(body, `data-website-id="8317012e-c8ab-4b59-bc86-2e708ceac202"`) {
+			t.Fatalf("body missing analytics website id")
+		}
+		if !strings.Contains(body, `data-auto-track="false"`) {
+			t.Fatalf("body missing analytics auto-track configuration")
 		}
 	})
 

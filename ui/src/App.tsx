@@ -2,7 +2,7 @@ import './App.css'
 
 import { lazy, ReactNode, Suspense, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Outlet, useSearchParams } from 'react-router-dom'
+import { Outlet, useLocation, useSearchParams } from 'react-router-dom'
 
 import { AIChatbox, StandaloneAIChatbox } from './components/ai-chat/ai-chatbox'
 import { AppSidebar } from './components/app-sidebar'
@@ -21,6 +21,8 @@ import { ClusterProvider } from './contexts/cluster-context'
 import { TerminalProvider, useTerminal } from './contexts/terminal-context'
 import { useCluster } from './hooks/use-cluster'
 import { apiClient } from './lib/api-client'
+import { trackPage } from './lib/analytics'
+import { getAnalyticsPageKey } from './lib/analytics-route'
 import { prefetchMonaco } from './lib/monaco-runtime'
 
 const FloatingTerminal = lazy(async () => {
@@ -100,6 +102,16 @@ function AppContent() {
   )
 }
 
+function AnalyticsBridge() {
+  const location = useLocation()
+
+  useEffect(() => {
+    trackPage(getAnalyticsPageKey(location.pathname))
+  }, [location.pathname])
+
+  return null
+}
+
 function AppProviders({ children }: { children: ReactNode }) {
   useEffect(() => {
     prefetchMonaco()
@@ -121,6 +133,7 @@ function AppProviders({ children }: { children: ReactNode }) {
 function App() {
   return (
     <AppProviders>
+      <AnalyticsBridge />
       <ClusterGate>
         <AppContent />
       </ClusterGate>
@@ -131,6 +144,7 @@ function App() {
 export function StandaloneAIChatApp() {
   return (
     <AppProviders>
+      <AnalyticsBridge />
       <ClusterGate>
         <StandaloneAIChatbox />
       </ClusterGate>

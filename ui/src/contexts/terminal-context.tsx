@@ -1,12 +1,15 @@
 import { createContext, ReactNode, useContext, useState } from 'react'
 
+import { trackEvent } from '@/lib/analytics'
+import { getCurrentAnalyticsPageKey } from '@/lib/analytics-route'
+
 interface TerminalContextType {
   isOpen: boolean
   isMinimized: boolean
-  openTerminal: () => void
+  openTerminal: (entry?: string) => void
   closeTerminal: () => void
   minimizeTerminal: () => void
-  toggleTerminal: () => void
+  toggleTerminal: (entry?: string) => void
 }
 
 const TerminalContext = createContext<TerminalContextType | undefined>(
@@ -18,7 +21,14 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
   const [isMinimized, setIsMinimized] = useState(false)
 
   // Open (or un-minimize) the terminal
-  const openTerminal = () => {
+  const openTerminal = (entry: string = 'button') => {
+    if (!isOpen) {
+      trackEvent('kubectl_terminal_open', {
+        runtime: 'desktop',
+        entry,
+        page: getCurrentAnalyticsPageKey(),
+      })
+    }
     setIsOpen(true)
     setIsMinimized(false)
   }
@@ -35,9 +45,9 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
   }
 
   // Toggle open/minimized
-  const toggleTerminal = () => {
+  const toggleTerminal = (entry: string = 'button') => {
     if (!isOpen) {
-      openTerminal()
+      openTerminal(entry)
     } else if (isMinimized) {
       setIsMinimized(false)
     } else {

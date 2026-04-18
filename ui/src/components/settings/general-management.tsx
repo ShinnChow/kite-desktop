@@ -46,6 +46,22 @@ interface GeneralSettingsFormData {
   enableVersionCheck: boolean
 }
 
+export function shouldReloadForAnalyticsChange(
+  previousEnableAnalytics: boolean | undefined,
+  nextEnableAnalytics: boolean
+) {
+  return (
+    typeof previousEnableAnalytics === 'boolean' &&
+    previousEnableAnalytics !== nextEnableAnalytics
+  )
+}
+
+export const browserRuntime = {
+  reloadWindow() {
+    window.location.reload()
+  },
+}
+
 export function GeneralManagement() {
   const { t } = useTranslation()
   const { isDesktop } = useRuntime()
@@ -64,7 +80,7 @@ export function GeneralManagement() {
     kubectlEnabled: true,
     kubectlImage: DEFAULT_KUBECTL_IMAGE,
     nodeTerminalImage: DEFAULT_NODE_TERMINAL_IMAGE,
-    enableAnalytics: true,
+    enableAnalytics: false,
     enableVersionCheck: true,
   })
 
@@ -91,7 +107,17 @@ export function GeneralManagement() {
   const mutation = useMutation({
     mutationFn: (payload: GeneralSettingUpdateRequest) =>
       updateGeneralSetting(payload),
-    onSuccess: () => {
+    onSuccess: (updated) => {
+      if (
+        shouldReloadForAnalyticsChange(
+          data?.enableAnalytics,
+          updated.enableAnalytics
+        )
+      ) {
+        browserRuntime.reloadWindow()
+        return
+      }
+
       queryClient.invalidateQueries({
         predicate: (query) =>
           query.queryKey[0] === 'general-setting' ||
@@ -498,7 +524,7 @@ export function GeneralManagement() {
             <p className="mt-1 text-xs text-muted-foreground">
               {t(
                 'generalManagement.runtime.description',
-                'Configure analytics and version checking behavior.'
+                'Configure usage analytics and version checking. Turning off analytics does not disable version checks.'
               )}
             </p>
           </div>

@@ -9,16 +9,24 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 )
 
-const kiteBasePlaceholder = "__KITE_BASE__"
+const (
+	kiteBasePlaceholder = "__KITE_BASE__"
+	umamiScriptSrc      = "https://umami.eryajf.net/script.js"
+	umamiWebsiteID      = "8317012e-c8ab-4b59-bc86-2e708ceac202"
+)
 
 func InjectAnalytics(htmlContent string) string {
-	analyticsScript := `<script defer src="https://cloud.umami.is/script.js" data-website-id="c3d8a914-abbc-4eed-9699-a9192c4bef9e" data-exclude-search="true" data-exclude-hash="true" data-do-not-track="true"></script>`
+	analyticsScript := fmt.Sprintf(
+		`<script defer src="%s" data-website-id="%s" data-auto-track="false" data-tag="desktop" data-domains="127.0.0.1,localhost" data-exclude-search="true" data-exclude-hash="true" data-do-not-track="true"></script>`,
+		umamiScriptSrc,
+		umamiWebsiteID,
+	)
 
-	re := regexp.MustCompile(`</head>`)
-	return re.ReplaceAllString(htmlContent, "  "+analyticsScript+"\n  </head>")
+	re := regexp.MustCompile(`<head>`)
+	return re.ReplaceAllString(htmlContent, "<head>\n    "+analyticsScript)
 }
 
-func InjectKiteBase(htmlContent string, base string) string {
+func InjectKiteBase(htmlContent string, base string, analyticsEnabled bool) string {
 	assetBase := base
 	if assetBase == "/" {
 		assetBase = ""
@@ -26,7 +34,11 @@ func InjectKiteBase(htmlContent string, base string) string {
 
 	htmlContent = strings.ReplaceAll(htmlContent, kiteBasePlaceholder, html.EscapeString(assetBase))
 
-	baseScript := fmt.Sprintf(`<script>window.__dynamic_base__=%q;</script>`, assetBase)
+	baseScript := fmt.Sprintf(
+		`<script>window.__dynamic_base__=%q;window.__kite_analytics_enabled__=%t;</script>`,
+		assetBase,
+		analyticsEnabled,
+	)
 	re := regexp.MustCompile(`<head>`)
 	return re.ReplaceAllString(htmlContent, "<head>\n    "+baseScript)
 }

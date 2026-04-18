@@ -606,7 +606,7 @@
     },
     "runtime": {
       "title": "运行时",
-      "description": "配置数据分析和版本检查行为。",
+      "description": "配置使用数据分析和版本检查。关闭数据分析不会关闭版本检查。",
       "form": {
         "enableAnalytics": "启用数据分析",
         "enableVersionCheck": "启用版本检查"

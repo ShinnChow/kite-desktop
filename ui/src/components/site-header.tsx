@@ -61,7 +61,7 @@ export function SiteHeader() {
             />
             {canManageSettings && kubectlEnabled && (
               <button
-                onClick={toggleTerminal}
+                onClick={() => toggleTerminal('button')}
                 title={t('siteHeader.kubectlTerminal')}
                 aria-label={t('siteHeader.toggleKubectlTerminal')}
                 className={`flex items-center justify-center rounded-sm p-1 transition-colors ${

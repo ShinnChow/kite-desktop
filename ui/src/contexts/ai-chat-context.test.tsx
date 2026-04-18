@@ -20,9 +20,17 @@ const {
   closeAIChatSidecar: vi.fn().mockResolvedValue(true),
 }))
 
+const { trackEvent } = vi.hoisted(() => ({
+  trackEvent: vi.fn(),
+}))
+
 vi.mock('@/lib/api', () => ({
   useAIStatus,
   useGeneralSetting,
+}))
+
+vi.mock('@/lib/analytics', () => ({
+  trackEvent,
 }))
 
 vi.mock('@/contexts/runtime-context', () => ({
@@ -39,7 +47,7 @@ vi.mock('@/lib/desktop', () => ({
 }))
 
 function AIChatStateProbe() {
-  const { isAvailable, isOpen, pageContext } = useAIChatContext()
+  const { isAvailable, isOpen, pageContext, openChat } = useAIChatContext()
 
   return (
     <div>
@@ -47,6 +55,9 @@ function AIChatStateProbe() {
       <span data-testid="state">{isOpen ? 'open' : 'closed'}</span>
       <span data-testid="page">{pageContext.page}</span>
       <span data-testid="resource">{pageContext.resourceName}</span>
+      <button type="button" onClick={openChat}>
+        open
+      </button>
     </div>
   )
 }
@@ -92,24 +103,32 @@ describe('AIChatProvider', () => {
     await waitFor(() => {
       expect(screen.getByTestId('state')).toHaveTextContent('open')
     })
+    expect(trackEvent).toHaveBeenCalledWith('ai_chat_open', {
+      runtime: 'desktop',
+      entry: 'shortcut',
+      page: 'pods/list',
+    })
 
     fireEvent.keyDown(document, { key: 'A', ctrlKey: true, shiftKey: true })
 
     await waitFor(() => {
       expect(screen.getByTestId('state')).toHaveTextContent('closed')
     })
+    expect(trackEvent).toHaveBeenCalledTimes(1)
 
     fireEvent(window, new Event(AI_CHAT_TOGGLE_EVENT))
 
     await waitFor(() => {
       expect(screen.getByTestId('state')).toHaveTextContent('open')
     })
+    expect(trackEvent).toHaveBeenCalledTimes(2)
 
     fireEvent(window, new Event(AI_CHAT_TOGGLE_EVENT))
 
     await waitFor(() => {
       expect(screen.getByTestId('state')).toHaveTextContent('closed')
     })
+    expect(trackEvent).toHaveBeenCalledTimes(2)
   })
 
   it('does not expose the shortcut on unavailable pages or when AI is disabled', async () => {
@@ -158,12 +177,14 @@ describe('AIChatProvider', () => {
     })
 
     expect(screen.getByTestId('state')).toHaveTextContent('closed')
+    expect(trackEvent).not.toHaveBeenCalled()
 
     fireEvent(window, new Event(AI_CHAT_TOGGLE_EVENT))
 
     await waitFor(() => {
       expect(toggleAIChatSidecar).toHaveBeenCalledTimes(2)
     })
+    expect(trackEvent).not.toHaveBeenCalled()
   })
 
   it('handles the shortcut inside standalone ai chat page when sidecar mode is enabled', async () => {
@@ -225,6 +246,22 @@ describe('AIChatProvider', () => {
     await waitFor(() => {
       expect(screen.getByTestId('page')).toHaveTextContent('pod-detail')
       expect(screen.getByTestId('resource')).toHaveTextContent('api-server')
+    })
+  })
+
+  it('tracks button-triggered AI chat opens with a sanitized page key', async () => {
+    renderProvider('/pods/default/nginx')
+
+    fireEvent.click(screen.getByRole('button', { name: 'open' }))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('state')).toHaveTextContent('open')
+    })
+
+    expect(trackEvent).toHaveBeenCalledWith('ai_chat_open', {
+      runtime: 'desktop',
+      entry: 'button',
+      page: 'pods/detail',
     })
   })
 })
