@@ -31,43 +31,7 @@ func TestMain(m *testing.M) {
 }
 
 func TestGetPreferenceClusterNamePrecedence(t *testing.T) {
-	t.Run("context beats header query and cookie", func(t *testing.T) {
-		ctx := newFavoriteContextWithRequest(t, http.MethodGet, "/favorites", nil)
-		ctx.Set(middleware.ClusterNameKey, "context-cluster")
-		ctx.Request.Header.Set(middleware.ClusterNameHeader, "header-cluster")
-		ctx.Request.URL.RawQuery = middleware.ClusterNameHeader + "=query-cluster"
-
-		if got := getPreferenceClusterName(ctx); got != "context-cluster" {
-			t.Fatalf("getPreferenceClusterName() = %q, want %q", got, "context-cluster")
-		}
-	})
-
-	t.Run("header beats query and cookie", func(t *testing.T) {
-		ctx := newFavoriteContextWithRequest(t, http.MethodGet, "/favorites", nil)
-		ctx.Request.Header.Set(middleware.ClusterNameHeader, "header-cluster")
-		ctx.Request.URL.RawQuery = middleware.ClusterNameHeader + "=query-cluster"
-
-		if got := getPreferenceClusterName(ctx); got != "header-cluster" {
-			t.Fatalf("getPreferenceClusterName() = %q, want %q", got, "header-cluster")
-		}
-	})
-
-	t.Run("query beats cookie", func(t *testing.T) {
-		ctx := newFavoriteContextWithRequest(t, http.MethodGet, "/favorites", nil)
-		ctx.Request.URL.RawQuery = middleware.ClusterNameHeader + "=query-cluster"
-
-		if got := getPreferenceClusterName(ctx); got != "query-cluster" {
-			t.Fatalf("getPreferenceClusterName() = %q, want %q", got, "query-cluster")
-		}
-	})
-
-	t.Run("cookie fallback", func(t *testing.T) {
-		ctx := newFavoriteContextWithRequest(t, http.MethodGet, "/favorites", nil)
-
-		if got := getPreferenceClusterName(ctx); got != "cookie-cluster" {
-			t.Fatalf("getPreferenceClusterName() = %q, want %q", got, "cookie-cluster")
-		}
-	})
+	assertClusterNamePrecedence(t, newFavoriteContext, getPreferenceClusterName, "getPreferenceClusterName")
 }
 
 func TestFavoriteHandlersCRUD(t *testing.T) {
@@ -156,13 +120,13 @@ func setupFavoriteHandlerTestDB(t *testing.T) {
 	}
 }
 
-func newFavoriteContextWithRequest(t *testing.T, method, path string, body []byte) *gin.Context {
+func newFavoriteContext(t *testing.T) *gin.Context {
 	t.Helper()
 
 	gin.SetMode(gin.TestMode)
 	rec := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(rec)
-	req := httptest.NewRequest(method, path, bytes.NewReader(body))
+	req := httptest.NewRequest(http.MethodGet, "/favorites", nil)
 	req.AddCookie(&http.Cookie{Name: middleware.ClusterNameHeader, Value: "cookie-cluster"})
 	ctx.Request = req
 	return ctx

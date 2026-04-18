@@ -65,43 +65,7 @@ func TestSortResults(t *testing.T) {
 }
 
 func TestGetSearchClusterNamePrecedence(t *testing.T) {
-	t.Run("context beats header query and cookie", func(t *testing.T) {
-		ctx := newSearchContextWithRequest(t)
-		ctx.Set(middleware.ClusterNameKey, "context-cluster")
-		ctx.Request.Header.Set(middleware.ClusterNameHeader, "header-cluster")
-		ctx.Request.URL.RawQuery = middleware.ClusterNameHeader + "=query-cluster"
-
-		if got := getSearchClusterName(ctx); got != "context-cluster" {
-			t.Fatalf("getSearchClusterName() = %q, want %q", got, "context-cluster")
-		}
-	})
-
-	t.Run("header beats query and cookie", func(t *testing.T) {
-		ctx := newSearchContextWithRequest(t)
-		ctx.Request.Header.Set(middleware.ClusterNameHeader, "header-cluster")
-		ctx.Request.URL.RawQuery = middleware.ClusterNameHeader + "=query-cluster"
-
-		if got := getSearchClusterName(ctx); got != "header-cluster" {
-			t.Fatalf("getSearchClusterName() = %q, want %q", got, "header-cluster")
-		}
-	})
-
-	t.Run("query beats cookie", func(t *testing.T) {
-		ctx := newSearchContextWithRequest(t)
-		ctx.Request.URL.RawQuery = middleware.ClusterNameHeader + "=query-cluster"
-
-		if got := getSearchClusterName(ctx); got != "query-cluster" {
-			t.Fatalf("getSearchClusterName() = %q, want %q", got, "query-cluster")
-		}
-	})
-
-	t.Run("cookie fallback", func(t *testing.T) {
-		ctx := newSearchContextWithRequest(t)
-
-		if got := getSearchClusterName(ctx); got != "cookie-cluster" {
-			t.Fatalf("getSearchClusterName() = %q, want %q", got, "cookie-cluster")
-		}
-	})
+	assertClusterNamePrecedence(t, newSearchContextWithRequest, getSearchClusterName, "getSearchClusterName")
 }
 
 func TestGlobalSearchNegativeLimitDoesNotPanic(t *testing.T) {
