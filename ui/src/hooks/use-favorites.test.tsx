@@ -1,29 +1,36 @@
+import type { ReactNode } from 'react'
 import { act, renderHook, waitFor } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { type SearchResult } from '@/lib/api'
-
+import type { FavoriteResource, SearchResult } from '@/lib/api'
 import { useFavorites } from './use-favorites'
 
-const createStorage = () => {
-  const store = new Map<string, string>()
+const favoritesStore: FavoriteResource[] = []
+
+const apiMocks = vi.hoisted(() => ({
+  addFavoriteResource: vi.fn(),
+  listFavoriteResources: vi.fn(),
+  removeFavoriteResource: vi.fn(),
+}))
+let currentClusterMock = 'cluster-a'
+
+vi.mock('@/lib/api', async () => {
+  const actual = await vi.importActual<typeof import('@/lib/api')>('@/lib/api')
 
   return {
-    getItem: (key: string) => store.get(key) ?? null,
-    setItem: (key: string, value: string) => {
-      store.set(key, value)
-    },
-    removeItem: (key: string) => {
-      store.delete(key)
-    },
-    clear: () => {
-      store.clear()
-    },
+    ...actual,
+    addFavoriteResource: apiMocks.addFavoriteResource,
+    listFavoriteResources: apiMocks.listFavoriteResources,
+    removeFavoriteResource: apiMocks.removeFavoriteResource,
   }
-}
+})
 
-vi.stubGlobal('localStorage', createStorage())
-vi.stubGlobal('sessionStorage', createStorage())
+vi.mock('@/hooks/use-cluster', () => ({
+  useCluster: () => ({
+    currentCluster: currentClusterMock,
+  }),
+}))
 
 const favorite: SearchResult = {
   id: 'resource-1',
@@ -33,48 +40,111 @@ const favorite: SearchResult = {
   createdAt: '2026-03-27T00:00:00.000Z',
 }
 
-describe('useFavorites', () => {
-  beforeEach(() => {
-    localStorage.clear()
-    sessionStorage.clear()
+function createQueryWrapper() {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+      },
+    },
   })
 
-  it('adds and removes favorites while keeping state in sync with storage', async () => {
-    const { result } = renderHook(() => useFavorites())
+  return ({ children }: { children: ReactNode }) => (
+    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+  )
+}
+
+describe('useFavorites', () => {
+  beforeEach(() => {
+    favoritesStore.length = 0
+    currentClusterMock = 'cluster-a'
+    vi.restoreAllMocks()
+
+    apiMocks.listFavoriteResources.mockImplementation(async () => [...favoritesStore])
+    apiMocks.addFavoriteResource.mockImplementation(async (data: {
+      resourceType: string
+      namespace?: string
+      resourceName: string
+    }) => {
+      const existing = favoritesStore.find(
+        (favorite) =>
+          favorite.resourceType === data.resourceType &&
+          favorite.namespace === data.namespace &&
+          favorite.resourceName === data.resourceName
+      )
+      if (existing) {
+        return existing
+      }
+
+      const created: FavoriteResource = {
+        id: favoritesStore.length + 1,
+        clusterName: 'cluster-a',
+        resourceType: data.resourceType,
+        namespace: data.namespace,
+        resourceName: data.resourceName,
+        createdAt: '2026-03-27T00:00:00.000Z',
+        updatedAt: '2026-03-27T00:00:00.000Z',
+      }
+      favoritesStore.push(created)
+      return created
+    })
+    apiMocks.removeFavoriteResource.mockImplementation(async (data: {
+      resourceType: string
+      namespace?: string
+      resourceName: string
+    }) => {
+      const index = favoritesStore.findIndex(
+        (favorite) =>
+          favorite.resourceType === data.resourceType &&
+          favorite.namespace === data.namespace &&
+          favorite.resourceName === data.resourceName
+      )
+      if (index >= 0) {
+        favoritesStore.splice(index, 1)
+      }
+    })
+  })
+
+  it('adds and removes favorites while keeping state in sync with the backend', async () => {
+    const { result } = renderHook(() => useFavorites(), {
+      wrapper: createQueryWrapper(),
+    })
 
     await waitFor(() => expect(result.current.favorites).toEqual([]))
 
-    act(() => {
-      result.current.addToFavorites(favorite)
+    await act(async () => {
+      await result.current.addToFavorites(favorite)
     })
 
     await waitFor(() => expect(result.current.favorites).toHaveLength(1))
-    expect(result.current.favorites[0]).toEqual(favorite)
-    expect(result.current.isFavorite(favorite.id)).toBe(true)
+    expect(result.current.favorites[0].name).toBe(favorite.name)
+    expect(result.current.isFavorite(favorite)).toBe(true)
 
-    act(() => {
-      result.current.removeFromFavorites(favorite.id)
+    await act(async () => {
+      await result.current.removeFromFavorites(favorite)
     })
 
     await waitFor(() => expect(result.current.favorites).toEqual([]))
-    expect(result.current.isFavorite(favorite.id)).toBe(false)
+    expect(result.current.isFavorite(favorite)).toBe(false)
   })
 
   it('returns the new favorite state when toggling a resource', async () => {
-    const { result } = renderHook(() => useFavorites())
+    const { result } = renderHook(() => useFavorites(), {
+      wrapper: createQueryWrapper(),
+    })
 
     await waitFor(() => expect(result.current.favorites).toEqual([]))
 
     let nextState = false
-    act(() => {
-      nextState = result.current.toggleFavorite(favorite)
+    await act(async () => {
+      nextState = await result.current.toggleFavorite(favorite)
     })
 
     expect(nextState).toBe(true)
-    await waitFor(() => expect(result.current.favorites).toEqual([favorite]))
+    await waitFor(() => expect(result.current.favorites).toHaveLength(1))
 
-    act(() => {
-      nextState = result.current.toggleFavorite(favorite)
+    await act(async () => {
+      nextState = await result.current.toggleFavorite(favorite)
     })
 
     expect(nextState).toBe(false)

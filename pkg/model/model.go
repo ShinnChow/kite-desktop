@@ -99,6 +99,7 @@ func InitDB() {
 		Role{},
 		RoleAssignment{},
 		ResourceHistory{},
+		FavoriteResource{},
 		ResourceTemplate{},
 		PendingSession{},
 		AIChatSession{},

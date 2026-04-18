@@ -70,6 +70,38 @@ export interface SearchResponse {
   total: number
 }
 
+export interface FavoriteResource {
+  id: number
+  clusterName: string
+  resourceType: string
+  namespace?: string
+  resourceName: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface FavoriteResourceRequest {
+  resourceType: string
+  namespace?: string
+  resourceName: string
+}
+
+export const listFavoriteResources = async (): Promise<FavoriteResource[]> => {
+  return fetchAPI<FavoriteResource[]>('/preferences/favorites')
+}
+
+export const addFavoriteResource = async (
+  data: FavoriteResourceRequest
+): Promise<FavoriteResource> => {
+  return apiClient.post<FavoriteResource>('/preferences/favorites', data)
+}
+
+export const removeFavoriteResource = async (
+  data: FavoriteResourceRequest
+): Promise<void> => {
+  await apiClient.post<void>('/preferences/favorites/remove', data)
+}
+
 // Global search API
 export const globalSearch = async (
   query: string,

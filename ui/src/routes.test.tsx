@@ -17,6 +17,10 @@ vi.mock('./pages/overview', () => ({
   Overview: () => <div>overview page</div>,
 }))
 
+vi.mock('./pages/favorites', () => ({
+  FavoritesPage: () => <div>favorites page</div>,
+}))
+
 vi.mock('./pages/settings', () => ({
   SettingsPage: () => <div>settings page</div>,
 }))
@@ -39,14 +43,15 @@ vi.mock('./lib/subpath', () => ({
 
 import { router } from './routes'
 
-function renderRouter(path: string) {
+async function renderRouter(path: string) {
   window.history.pushState({}, '', path)
+  await router.navigate(path)
   return render(<RouterProvider router={router} />)
 }
 
 describe('router', () => {
   it('renders the root app without login/setup guards', async () => {
-    renderRouter('/')
+    await renderRouter('/')
 
     expect(await screen.findByText('app shell')).toBeInTheDocument()
     expect(screen.queryByTestId('init-check-route')).not.toBeInTheDocument()
@@ -79,5 +84,12 @@ describe('router', () => {
 
     expect(routes.some((route) => route.path === '/login')).toBe(false)
     expect(routes.some((route) => route.path === '/setup')).toBe(false)
+  })
+
+  it('renders the dedicated favorites page before generic resource routes', async () => {
+    await renderRouter('/favorites')
+
+    expect(await screen.findByText('favorites page')).toBeInTheDocument()
+    expect(screen.queryByText('resource list page')).not.toBeInTheDocument()
   })
 })

@@ -1,59 +1,120 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useMemo } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
-import { SearchResult } from '@/lib/api'
 import {
-  addToFavorites as addToFavoritesStorage,
-  getFavorites as getFavoritesFromStorage,
-  isFavorite as isFavoriteStorage,
-  removeFromFavorites as removeFromFavoritesStorage,
-  toggleFavorite as toggleFavoriteStorage,
-} from '@/lib/favorites'
+  addFavoriteResource,
+  FavoriteResource,
+  listFavoriteResources,
+  removeFavoriteResource,
+  SearchResult,
+} from '@/lib/api'
+import { buildFavoriteKeyFromResource } from '@/lib/favorites'
+import { useCluster } from '@/hooks/use-cluster'
+
+function favoriteToSearchResult(favorite: FavoriteResource): SearchResult {
+  return {
+    id: buildFavoriteKeyFromResource({
+      resourceType: favorite.resourceType,
+      namespace: favorite.namespace,
+      resourceName: favorite.resourceName,
+    }),
+    name: favorite.resourceName,
+    namespace: favorite.namespace,
+    resourceType: favorite.resourceType,
+    createdAt: favorite.createdAt,
+  }
+}
+
+function toFavoriteRequest(resource: SearchResult) {
+  return {
+    resourceType: resource.resourceType,
+    namespace: resource.namespace,
+    resourceName: resource.name,
+  }
+}
 
 export function useFavorites() {
-  const [favorites, setFavorites] = useState<SearchResult[]>([])
-  const [refreshKey, setRefreshKey] = useState(0)
+  const queryClient = useQueryClient()
+  const { currentCluster } = useCluster()
+  const queryKey = ['favorites', currentCluster] as const
 
-  // Load favorites on mount
-  useEffect(() => {
-    setFavorites(getFavoritesFromStorage())
-  }, [refreshKey])
+  const favoritesQuery = useQuery({
+    queryKey,
+    queryFn: async () => {
+      if (!currentCluster) {
+        return [] as FavoriteResource[]
+      }
+      return listFavoriteResources()
+    },
+    enabled: !!currentCluster,
+  })
 
-  // Refresh favorites list
-  const refreshFavorites = useCallback(() => {
-    setRefreshKey((prev) => prev + 1)
-  }, [])
+  const favorites = useMemo(
+    () => (favoritesQuery.data || []).map(favoriteToSearchResult),
+    [favoritesQuery.data]
+  )
+  const favoriteKeys = useMemo(
+    () =>
+      new Set(
+        favorites.map((favorite) => buildFavoriteKeyFromResource(favorite))
+      ),
+    [favorites]
+  )
 
-  // Add to favorites
+  const refreshFavorites = useCallback(async () => {
+    await queryClient.invalidateQueries({
+      queryKey: ['favorites', currentCluster],
+    })
+  }, [queryClient, currentCluster])
+
+  const addMutation = useMutation({
+    mutationFn: async (resource: SearchResult) =>
+      addFavoriteResource(toFavoriteRequest(resource)),
+    onSuccess: async () => {
+      await refreshFavorites()
+    },
+  })
+
+  const removeMutation = useMutation({
+    mutationFn: async (resource: SearchResult) =>
+      removeFavoriteResource(toFavoriteRequest(resource)),
+    onSuccess: async () => {
+      await refreshFavorites()
+    },
+  })
+
   const addToFavorites = useCallback(
-    (resource: SearchResult) => {
-      addToFavoritesStorage(resource)
-      refreshFavorites()
+    async (resource: SearchResult) => {
+      await addMutation.mutateAsync(resource)
     },
-    [refreshFavorites]
+    [addMutation]
   )
 
-  // Remove from favorites
   const removeFromFavorites = useCallback(
-    (resourceId: string) => {
-      removeFromFavoritesStorage(resourceId)
-      refreshFavorites()
+    async (resource: SearchResult) => {
+      await removeMutation.mutateAsync(resource)
     },
-    [refreshFavorites]
+    [removeMutation]
   )
 
-  // Check if resource is favorite
-  const isFavorite = useCallback((resourceId: string) => {
-    return isFavoriteStorage(resourceId)
-  }, []) // No dependencies needed as we always check current storage state
-
-  // Toggle favorite status
-  const toggleFavorite = useCallback(
-    (resource: SearchResult) => {
-      const isFavorite = toggleFavoriteStorage(resource)
-      refreshFavorites()
-      return isFavorite
+  const isFavorite = useCallback(
+    (resource: Pick<SearchResult, 'name' | 'namespace' | 'resourceType'>) => {
+      return favoriteKeys.has(buildFavoriteKeyFromResource(resource))
     },
-    [refreshFavorites]
+    [favoriteKeys]
+  )
+
+  const toggleFavorite = useCallback(
+    async (resource: SearchResult) => {
+      if (favoriteKeys.has(buildFavoriteKeyFromResource(resource))) {
+        await removeMutation.mutateAsync(resource)
+        return false
+      }
+
+      await addMutation.mutateAsync(resource)
+      return true
+    },
+    [addMutation, favoriteKeys, removeMutation]
   )
 
   return {
@@ -63,5 +124,6 @@ export function useFavorites() {
     isFavorite,
     toggleFavorite,
     refreshFavorites,
+    isLoading: favoritesQuery.isLoading,
   }
 }
