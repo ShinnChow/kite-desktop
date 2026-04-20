@@ -4,9 +4,11 @@ import {
   PaginationState,
   Table as TableInstance,
 } from '@tanstack/react-table'
+import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { cn } from '@/lib/utils'
+import { ColumnFilterPopover } from '@/components/column-filter-popover'
 import { Button } from '@/components/ui/button'
 import {
   Select,
@@ -174,35 +176,51 @@ export function ResourceTableView<T>({
                       {headerGroup.headers.map((header, index) => (
                         <TableHead
                           key={header.id}
-                          className={index <= 1 ? 'text-left' : 'text-center'}
+                          className={cn(
+                            index <= 1 ? 'text-left' : 'text-center',
+                            'group/header'
+                          )}
                         >
-                          {header.isPlaceholder ? null : header.column.getCanSort() ? (
-                            <Button
-                              variant="ghost"
-                              onClick={header.column.getToggleSortingHandler()}
-                              className={
-                                header.column.getIsSorted()
-                                  ? 'text-primary'
-                                  : ''
-                              }
+                          {header.isPlaceholder ? null : (
+                            <div
+                              className={cn(
+                                'flex items-center gap-0.5',
+                                index > 1 && 'justify-center'
+                              )}
                             >
-                              {flexRender(
-                                header.column.columnDef.header,
-                                header.getContext()
+                              {header.column.getCanSort() ? (
+                                <Button
+                                  variant="ghost"
+                                  onClick={header.column.getToggleSortingHandler()}
+                                  className={
+                                    header.column.getIsSorted()
+                                      ? 'text-primary'
+                                      : ''
+                                  }
+                                >
+                                  {flexRender(
+                                    header.column.columnDef.header,
+                                    header.getContext()
+                                  )}
+                                  {header.column.getIsSorted() === 'asc' ? (
+                                    <ArrowUp className="ml-1 h-3.5 w-3.5" />
+                                  ) : header.column.getIsSorted() === 'desc' ? (
+                                    <ArrowDown className="ml-1 h-3.5 w-3.5" />
+                                  ) : (
+                                    <ArrowUpDown className="ml-1 h-3.5 w-3.5 opacity-0 group-hover/header:opacity-50" />
+                                  )}
+                                </Button>
+                              ) : (
+                                flexRender(
+                                  header.column.columnDef.header,
+                                  header.getContext()
+                                )
                               )}
-                              {header.column.getIsSorted() && (
-                                <span className="ml-2">
-                                  {header.column.getIsSorted() === 'asc'
-                                    ? '↑'
-                                    : '↓'}
-                                </span>
-                              )}
-                            </Button>
-                          ) : (
-                            flexRender(
-                              header.column.columnDef.header,
-                              header.getContext()
-                            )
+                              {header.column.getCanFilter() &&
+                                header.column.id !== 'select' && (
+                                  <ColumnFilterPopover column={header.column} />
+                                )}
+                            </div>
                           )}
                         </TableHead>
                       ))}

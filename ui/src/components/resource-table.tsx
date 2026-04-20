@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   ColumnDef,
   ColumnFiltersState,
+  FilterFn,
   getCoreRowModel,
   getFacetedRowModel,
   getFacetedUniqueValues,
@@ -343,10 +344,27 @@ export function ResourceTable<T>({
     }
   }, [useSSE, error])
 
+  // Custom filter function for faceted (multi-select) columns
+  const arrIncludesSome: FilterFn<T> = (row, columnId, filterValue) => {
+    if (!Array.isArray(filterValue) || filterValue.length === 0) return true
+    const value = String(row.getValue(columnId) ?? '')
+    return filterValue.includes(value)
+  }
+
+  // Apply arrIncludesSome filterFn to all filterable columns (unified faceted filter)
+  const columnsWithFilterFn = useMemo(() => {
+    return enhancedColumns.map((col) => {
+      if (col.id !== 'select' && !('filterFn' in col)) {
+        return { ...col, filterFn: arrIncludesSome }
+      }
+      return col
+    })
+  }, [enhancedColumns])
+
   // Create table instance using TanStack Table
   const table = useReactTable<T>({
     data: memoizedData,
-    columns: enhancedColumns,
+    columns: columnsWithFilterFn,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
@@ -639,14 +657,17 @@ export function ResourceTable<T>({
                 enableColumnFilter?: boolean
               }
               const uniqueValues = column.getFacetedUniqueValues()
-              const filterValue = column.getFilterValue() as string
+              const rawFilterValue = column.getFilterValue()
+              const filterValue = Array.isArray(rawFilterValue) && rawFilterValue.length === 1
+                ? (rawFilterValue[0] as string)
+                : ''
 
               return (
                 <Select
                   key={column.id}
-                  value={filterValue || ''}
+                  value={filterValue}
                   onValueChange={(value) =>
-                    column.setFilterValue(value === 'all' ? '' : value)
+                    column.setFilterValue(value === 'all' ? undefined : [value])
                   }
                 >
                   <SelectTrigger className="w-full sm:w-auto sm:min-w-[8.5rem] sm:max-w-[12rem]">
@@ -759,6 +780,7 @@ export function ResourceTable<T>({
                           key={column.id}
                           className="capitalize"
                           checked={column.getIsVisible()}
+                          onSelect={(e) => e.preventDefault()}
                           onCheckedChange={(value) =>
                             column.toggleVisibility(!!value)
                           }

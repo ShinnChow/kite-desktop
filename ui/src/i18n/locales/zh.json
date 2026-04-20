@@ -446,7 +446,13 @@
     "filterColumn": "筛选 {{column}}",
     "values": "值",
     "searchPlaceholder": "搜索资源...",
-    "toggleColumns": "切换列"
+    "toggleColumns": "切换列",
+    "columnFilter": {
+      "search": "筛选...",
+      "clear": "清除",
+      "selectAll": "全选",
+      "noResults": "没有匹配的值"
+    }
   },
   "rbac": {
     "title": "角色管理",
