@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { IconLoader, IconRefresh, IconTrash } from '@tabler/icons-react'
+import { IconLoader, IconTrash } from '@tabler/icons-react'
 import * as yaml from 'js-yaml'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
@@ -14,6 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { ResponsiveTabs } from '@/components/ui/responsive-tabs'
 import { DescribeDialog } from '@/components/describe-dialog'
+import { RefreshButton } from '@/components/refresh-button'
 import { ErrorMessage } from '@/components/error-message'
 import { EventTable } from '@/components/event-table'
 import { LabelsAnno } from '@/components/lables-anno'
@@ -117,15 +118,9 @@ export function SimpleResourceDetail<T extends ResourceType>(props: {
           )}
         </div>
         <div className="flex w-full flex-wrap gap-2 md:w-auto md:justify-end">
-          <Button
-            disabled={isLoading}
-            variant="outline"
-            size="sm"
-            onClick={handleManualRefresh}
-          >
-            <IconRefresh className="w-4 h-4" />
+          <RefreshButton variant="outline" size="sm" onClick={handleManualRefresh}>
             {t('detail.buttons.refresh')}
-          </Button>
+          </RefreshButton>
           <DescribeDialog
             resourceType={resourceType}
             namespace={namespace}

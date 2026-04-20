@@ -6,7 +6,6 @@ import {
   IconExclamationCircle,
   IconLoader,
   IconLock,
-  IconRefresh,
   IconReload,
 } from '@tabler/icons-react'
 import * as yaml from 'js-yaml'
@@ -49,6 +48,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { RefreshButton } from '@/components/refresh-button'
 import { DescribeDialog } from '@/components/describe-dialog'
 import { ErrorMessage } from '@/components/error-message'
 import { EventTable } from '@/components/event-table'
@@ -239,15 +239,9 @@ export function NodeDetail(props: { name: string }) {
           <h1 className="text-lg font-bold">{name}</h1>
         </div>
         <div className="flex w-full flex-wrap gap-2 md:w-auto md:justify-end">
-          <Button
-            disabled={isLoading}
-            variant="outline"
-            size="sm"
-            onClick={handleManualRefresh}
-          >
-            <IconRefresh className="w-4 h-4" />
+          <RefreshButton variant="outline" size="sm" onClick={handleManualRefresh}>
             {t('detail.buttons.refresh')}
-          </Button>
+          </RefreshButton>
           <DescribeDialog resourceType="nodes" name={name} />
           {/* Drain Node Popover */}
           <Popover

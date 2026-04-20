@@ -3,7 +3,6 @@ import {
   IconAdjustments,
   IconExternalLink,
   IconLoader,
-  IconRefresh,
   IconTrash,
 } from '@tabler/icons-react'
 import * as yaml from 'js-yaml'
@@ -37,6 +36,7 @@ import { ResourceEditor } from '@/components/editors/resource-editor'
 import { ErrorMessage } from '@/components/error-message'
 import { EventTable } from '@/components/event-table'
 import { LabelsAnno } from '@/components/lables-anno'
+import { RefreshButton } from '@/components/refresh-button'
 import { LogViewer } from '@/components/log-viewer'
 import { PodFileBrowser } from '@/components/pod-file-browser'
 import { PodMonitoring } from '@/components/pod-monitoring'
@@ -204,10 +204,9 @@ export function PodDetail(props: { namespace: string; name: string }) {
           </p>
         </div>
         <div className="flex w-full flex-wrap gap-2 md:w-auto md:justify-end">
-          <Button variant="outline" size="sm" onClick={handleManualRefresh}>
-            <IconRefresh className="w-4 h-4" />
+          <RefreshButton variant="outline" size="sm" onClick={handleManualRefresh}>
             {t('detail.buttons.refresh')}
-          </Button>
+          </RefreshButton>
           <DescribeDialog
             resourceType="pods"
             namespace={namespace}

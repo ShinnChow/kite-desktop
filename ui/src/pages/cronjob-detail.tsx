@@ -4,7 +4,6 @@ import {
   IconPlayerPause,
   IconPlayerPlay,
   IconPlayerPlayFilled,
-  IconRefresh,
   IconTrash,
 } from '@tabler/icons-react'
 import * as yaml from 'js-yaml'
@@ -25,6 +24,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { ResponsiveTabs } from '@/components/ui/responsive-tabs'
+import { RefreshButton } from '@/components/refresh-button'
 import { ContainerTable } from '@/components/container-table'
 import { DescribeDialog } from '@/components/describe-dialog'
 import { ErrorMessage } from '@/components/error-message'
@@ -357,10 +357,9 @@ export function CronJobDetail(props: { namespace: string; name: string }) {
           </p>
         </div>
         <div className="flex w-full flex-wrap gap-2 md:w-auto md:justify-end">
-          <Button variant="outline" size="sm" onClick={handleManualRefresh}>
-            <IconRefresh className="w-4 h-4" />
+          <RefreshButton variant="outline" size="sm" onClick={handleManualRefresh}>
             {t('detail.buttons.refresh')}
-          </Button>
+          </RefreshButton>
           <DescribeDialog
             resourceType={'cronjobs'}
             namespace={namespace}

@@ -420,7 +420,13 @@
     "filterColumn": "Filter {{column}}",
     "values": "Values",
     "searchPlaceholder": "Search resources...",
-    "toggleColumns": "Toggle columns"
+    "toggleColumns": "Toggle columns",
+    "columnFilter": {
+      "search": "Filter...",
+      "clear": "Clear",
+      "selectAll": "Select All",
+      "noResults": "No matching values"
+    }
   },
   "rbac": {
     "noPermissionCluster": "User {{user}} does not have permission to {{verb}} {{resource}} on cluster {{cluster}}",

@@ -7,7 +7,6 @@ import {
   IconFolder,
   IconHome,
   IconLoader,
-  IconRefresh,
   IconUpload,
 } from '@tabler/icons-react'
 import { Container } from 'kubernetes-types/core/v1'
@@ -34,6 +33,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 
+import { RefreshButton } from '@/components/refresh-button'
 import { ErrorMessage } from './error-message'
 import { ContainerSelector } from './selector/container-selector'
 
@@ -162,14 +162,12 @@ export function PodFileBrowser({
             }}
             className="font-mono"
           />
-          <Button
+          <RefreshButton
             aria-label={t('podFiles.refreshFileList')}
             variant="outline"
             size="icon"
             onClick={() => refetch()}
-          >
-            <IconRefresh className="w-4 h-4" />
-          </Button>
+          />
         </div>
         <div>
           <Input
