@@ -11,7 +11,7 @@ import {
 } from '@/types/api'
 import { clusterManagementQueryKey } from '@/lib/cluster-query'
 
-import { apiClient } from '../api-client'
+import { apiClient, APIError } from '../api-client'
 import { fetchAPI } from './shared'
 
 export interface ClusterCreateRequest {
@@ -31,6 +31,8 @@ export interface ClusterConnectionTestResponse {
   message: string
   version?: string
 }
+
+const clusterConnectionTestTimeoutMs = 15_000
 
 // Get cluster list for management
 export const fetchClusterList = (): Promise<Cluster[]> => {
@@ -58,10 +60,35 @@ export const createCluster = async (
 export const testClusterConnection = async (
   clusterData: ClusterCreateRequest
 ): Promise<ClusterConnectionTestResponse> => {
-  return await apiClient.post<ClusterConnectionTestResponse>(
-    '/admin/clusters/test',
-    clusterData
+  const controller = new AbortController()
+  const timeoutId = globalThis.setTimeout(
+    () => controller.abort(),
+    clusterConnectionTestTimeoutMs
   )
+
+  try {
+    return await apiClient.post<ClusterConnectionTestResponse>(
+      '/admin/clusters/test',
+      clusterData,
+      { signal: controller.signal }
+    )
+  } catch (error) {
+    if (
+      typeof error === 'object' &&
+      error !== null &&
+      'name' in error &&
+      error.name === 'AbortError'
+    ) {
+      throw new APIError(
+        `Connection test timed out after ${clusterConnectionTestTimeoutMs / 1000} seconds.`,
+        { code: 'CLUSTER_CONNECTION_TIMEOUT' }
+      )
+    }
+
+    throw error
+  } finally {
+    globalThis.clearTimeout(timeoutId)
+  }
 }
 
 // Update cluster

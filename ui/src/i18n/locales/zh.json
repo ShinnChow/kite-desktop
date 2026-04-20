@@ -829,7 +829,18 @@
       "testRequired": "添加前请先测试集群连接。",
       "testSuccess": "连接成功。",
       "testSuccessWithVersion": "连接成功，Kubernetes 版本：{{version}}",
+      "testErrorWithDetail": "{{message}} 详细信息：{{detail}}",
       "testError": "集群连接测试失败",
+      "testErrors": {
+        "timeout": "连接测试超时。请检查 Kubernetes API Server 地址、网络、VPN/代理或防火墙设置。",
+        "dns": "无法解析 Kubernetes API Server 地址。请检查 server 地址和 DNS 设置。",
+        "refused": "Kubernetes API Server 拒绝了连接。请确认 server 地址、端口以及本机网络访问是否正常。",
+        "tls": "TLS 证书校验失败。请检查 kubeconfig 中的 CA、证书或 server 地址。",
+        "unauthorized": "认证失败。请检查 kubeconfig 中的用户凭据、token 或客户端证书。",
+        "forbidden": "当前 kubeconfig 可以连到集群，但没有权限查询集群版本。",
+        "invalidConfig": "kubeconfig 无效或不完整。请检查 cluster、user 和 context 配置。",
+        "inClusterUnavailable": "当前环境无法使用 in-cluster 配置。"
+      },
       "createError": "创建集群失败",
       "updateError": "更新集群失败",
       "deleteError": "删除集群失败"

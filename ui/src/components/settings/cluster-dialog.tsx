@@ -3,10 +3,8 @@ import { IconEdit, IconInfoCircle, IconServer } from '@tabler/icons-react'
 import { useTranslation } from 'react-i18next'
 
 import { Cluster } from '@/types/api'
-import {
-  ClusterConnectionTestResponse,
-  ClusterCreateRequest,
-} from '@/lib/api'
+import { ClusterConnectionTestResponse, ClusterCreateRequest } from '@/lib/api'
+import { translateClusterConnectionError } from '@/lib/cluster-connection-errors'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -115,8 +113,7 @@ function ClusterDialogContent({
   }
 
   const handleChange = (field: string, value: string | boolean) => {
-    const nextValue =
-      typeof value === 'string' ? value : String(value)
+    const nextValue = typeof value === 'string' ? value : String(value)
     const currentValue =
       typeof formData[field as keyof typeof formData] === 'string'
         ? String(formData[field as keyof typeof formData])
@@ -164,14 +161,7 @@ function ClusterDialogContent({
     } catch (error) {
       setTestedSignature(null)
       setTestStatus('error')
-      setTestMessage(
-        error instanceof Error
-          ? error.message
-          : t(
-              'clusterManagement.messages.testError',
-              'Cluster connection test failed'
-            )
-      )
+      setTestMessage(translateClusterConnectionError(error, t))
     }
   }
 
@@ -286,7 +276,10 @@ function ClusterDialogContent({
         <div className="space-y-2">
           <div className="flex items-center gap-1.5">
             <Label htmlFor="prometheus-url">
-              {t('clusterManagement.form.prometheusURL.label', 'Prometheus URL')}
+              {t(
+                'clusterManagement.form.prometheusURL.label',
+                'Prometheus URL'
+              )}
             </Label>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -395,14 +388,14 @@ function ClusterDialogContent({
               type="button"
               variant="outline"
               onClick={handleTestConnection}
-            disabled={!canTestConnection || testStatus === 'testing'}
+              disabled={!canTestConnection || testStatus === 'testing'}
             >
               {testStatus === 'testing'
-                ? t(
-                    'clusterManagement.actions.testingConnection',
-                    'Testing...'
-                  )
-                : t('clusterManagement.actions.testConnection', 'Test Connection')}
+                ? t('clusterManagement.actions.testingConnection', 'Testing...')
+                : t(
+                    'clusterManagement.actions.testConnection',
+                    'Test Connection'
+                  )}
             </Button>
           </div>
         )}
@@ -419,9 +412,7 @@ function ClusterDialogContent({
             type="submit"
             disabled={
               !formData.name.trim() ||
-              (!isEditMode &&
-                !formData.inCluster &&
-                !formData.config.trim()) ||
+              (!isEditMode && !formData.inCluster && !formData.config.trim()) ||
               (!isEditMode && !isConnectionVerified) ||
               testStatus === 'testing'
             }

@@ -1,17 +1,21 @@
 package cluster
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/eryajf/kite-desktop/pkg/common"
 	"github.com/eryajf/kite-desktop/pkg/model"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 )
 
@@ -26,6 +30,30 @@ type clusterRequest struct {
 }
 
 var clusterConnectionTester = validateClusterConnection
+
+const clusterConnectionTestTimeout = 12 * time.Second
+
+const (
+	clusterConnectionErrorTimeout              = "CLUSTER_CONNECTION_TIMEOUT"
+	clusterConnectionErrorDNSResolutionFailed  = "CLUSTER_CONNECTION_DNS_RESOLUTION_FAILED"
+	clusterConnectionErrorRefused              = "CLUSTER_CONNECTION_REFUSED"
+	clusterConnectionErrorTLSFailed            = "CLUSTER_CONNECTION_TLS_FAILED"
+	clusterConnectionErrorUnauthorized         = "CLUSTER_CONNECTION_UNAUTHORIZED"
+	clusterConnectionErrorForbidden            = "CLUSTER_CONNECTION_FORBIDDEN"
+	clusterConnectionErrorInvalidConfig        = "CLUSTER_CONNECTION_INVALID_CONFIG"
+	clusterConnectionErrorInClusterUnavailable = "CLUSTER_CONNECTION_IN_CLUSTER_UNAVAILABLE"
+	clusterConnectionErrorUnknown              = "CLUSTER_CONNECTION_UNKNOWN"
+)
+
+type clusterConnectionError struct {
+	Code    string
+	Message string
+	Detail  string
+}
+
+func (e *clusterConnectionError) Error() string {
+	return e.Message
+}
 
 func (cm *ClusterManager) GetClusters(c *gin.Context) {
 	result := make([]common.ClusterInfo, 0, len(cm.clusters))
@@ -226,22 +254,128 @@ func (cm *ClusterManager) DeleteCluster(c *gin.Context) {
 }
 
 func validateClusterConnection(cluster *model.Cluster) (*ClientSet, error) {
-	cs, err := buildClientSet(cluster)
+	restConfig, err := buildClusterRESTConfig(cluster)
 	if err != nil {
-		return nil, err
-	}
-	if cs == nil || cs.K8sClient == nil || cs.K8sClient.ClientSet == nil {
-		return nil, errors.New("cluster client is not initialized")
+		return nil, formatClusterConnectionError(err)
 	}
 
-	version, err := cs.K8sClient.ClientSet.Discovery().ServerVersion()
+	restConfig = rest.CopyConfig(restConfig)
+	restConfig.Timeout = clusterConnectionTestTimeout
+
+	clientSet, err := kubernetes.NewForConfig(restConfig)
 	if err != nil {
-		cs.K8sClient.Stop(cluster.Name)
-		return nil, err
+		return nil, formatClusterConnectionError(err)
 	}
 
-	cs.Version = version.String()
-	return cs, nil
+	version, err := clientSet.Discovery().ServerVersion()
+	if err != nil {
+		return nil, formatClusterConnectionError(err)
+	}
+
+	return &ClientSet{
+		Name:    cluster.Name,
+		Version: version.String(),
+	}, nil
+}
+
+func buildClusterRESTConfig(cluster *model.Cluster) (*rest.Config, error) {
+	if cluster.InCluster {
+		return rest.InClusterConfig()
+	}
+
+	return clientcmd.RESTConfigFromKubeConfig([]byte(cluster.Config))
+}
+
+func formatClusterConnectionError(err error) error {
+	if err == nil {
+		return nil
+	}
+
+	message := err.Error()
+	lowerMessage := strings.ToLower(message)
+
+	switch {
+	case errors.Is(err, context.DeadlineExceeded),
+		strings.Contains(lowerMessage, "context deadline exceeded"),
+		strings.Contains(lowerMessage, "client.timeout exceeded"),
+		strings.Contains(lowerMessage, "i/o timeout"),
+		strings.Contains(lowerMessage, "tls handshake timeout"):
+		return &clusterConnectionError{
+			Code:    clusterConnectionErrorTimeout,
+			Message: fmt.Sprintf("Connection test timed out after %s.", clusterConnectionTestTimeout),
+			Detail:  message,
+		}
+	case strings.Contains(lowerMessage, "no such host"):
+		return &clusterConnectionError{
+			Code:    clusterConnectionErrorDNSResolutionFailed,
+			Message: "Failed to resolve the Kubernetes API Server host.",
+			Detail:  message,
+		}
+	case strings.Contains(lowerMessage, "connection refused"):
+		return &clusterConnectionError{
+			Code:    clusterConnectionErrorRefused,
+			Message: "The Kubernetes API Server refused the connection.",
+			Detail:  message,
+		}
+	case strings.Contains(lowerMessage, "x509:"):
+		return &clusterConnectionError{
+			Code:    clusterConnectionErrorTLSFailed,
+			Message: "TLS certificate validation failed.",
+			Detail:  message,
+		}
+	case strings.Contains(lowerMessage, "unauthorized"):
+		return &clusterConnectionError{
+			Code:    clusterConnectionErrorUnauthorized,
+			Message: "Authentication failed.",
+			Detail:  message,
+		}
+	case strings.Contains(lowerMessage, "forbidden"):
+		return &clusterConnectionError{
+			Code:    clusterConnectionErrorForbidden,
+			Message: "The current kubeconfig can reach the cluster, but it is not allowed to query cluster version.",
+			Detail:  message,
+		}
+	case strings.Contains(lowerMessage, "invalid configuration"),
+		strings.Contains(lowerMessage, "no configuration has been provided"),
+		strings.Contains(lowerMessage, "no server found for cluster"),
+		strings.Contains(lowerMessage, "failed to parse kubeconfig"):
+		return &clusterConnectionError{
+			Code:    clusterConnectionErrorInvalidConfig,
+			Message: "The kubeconfig is invalid or incomplete.",
+			Detail:  message,
+		}
+	case strings.Contains(lowerMessage, "inclusterconfig"),
+		strings.Contains(lowerMessage, "serviceaccount"),
+		strings.Contains(lowerMessage, "kubernetes service host"):
+		return &clusterConnectionError{
+			Code:    clusterConnectionErrorInClusterUnavailable,
+			Message: "In-cluster configuration is unavailable in the current environment.",
+			Detail:  message,
+		}
+	default:
+		return &clusterConnectionError{
+			Code:    clusterConnectionErrorUnknown,
+			Message: "Cluster connection test failed.",
+			Detail:  message,
+		}
+	}
+}
+
+func writeClusterConnectionError(c *gin.Context, err error) {
+	var connectionErr *clusterConnectionError
+	if errors.As(err, &connectionErr) {
+		response := gin.H{
+			"error":     connectionErr.Message,
+			"errorCode": connectionErr.Code,
+		}
+		if detail := strings.TrimSpace(connectionErr.Detail); detail != "" && detail != connectionErr.Message {
+			response["errorDetail"] = detail
+		}
+		c.JSON(http.StatusBadRequest, response)
+		return
+	}
+
+	c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 }
 
 func (cm *ClusterManager) TestClusterConnection(c *gin.Context) {
@@ -271,7 +405,7 @@ func (cm *ClusterManager) TestClusterConnection(c *gin.Context) {
 
 	cs, err := clusterConnectionTester(cluster)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		writeClusterConnectionError(c, err)
 		return
 	}
 	if cs != nil && cs.K8sClient != nil {

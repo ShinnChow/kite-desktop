@@ -39,7 +39,7 @@ type ClusterManager struct {
 func createClientSetInCluster(name, prometheusURL string) (*ClientSet, error) {
 	config, err := rest.InClusterConfig()
 	if err != nil {
-		return nil, err
+		return nil, formatClusterConnectionError(err)
 	}
 
 	return newClientSet(name, config, prometheusURL)
@@ -49,7 +49,7 @@ func createClientSetFromConfig(name, content, prometheusURL string) (*ClientSet,
 	restConfig, err := clientcmd.RESTConfigFromKubeConfig([]byte(content))
 	if err != nil {
 		klog.Warningf("Failed to create REST config for cluster %s: %v", name, err)
-		return nil, err
+		return nil, formatClusterConnectionError(err)
 	}
 	cs, err := newClientSet(name, restConfig, prometheusURL)
 	if err != nil {
@@ -69,7 +69,7 @@ func newClientSet(name string, k8sConfig *rest.Config, prometheusURL string) (*C
 	cs.K8sClient, err = kube.NewClient(k8sConfig)
 	if err != nil {
 		klog.Warningf("Failed to create k8s client for cluster %s: %v", name, err)
-		return nil, err
+		return nil, formatClusterConnectionError(err)
 	}
 	if prometheusURL == "" {
 		prometheusURL = discoveryPrometheusURL(cs.K8sClient)
