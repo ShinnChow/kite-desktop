@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   IconLoader,
-  IconRefresh,
   IconReload,
   IconScale,
   IconTrash,
@@ -52,6 +51,7 @@ import { ResourceDeleteConfirmationDialog } from '@/components/resource-delete-c
 import { ResourceHistoryTable } from '@/components/resource-history-table'
 import { Terminal } from '@/components/terminal'
 import { VolumeTable } from '@/components/volume-table'
+import { RefreshButton } from '@/components/refresh-button'
 import { YamlEditor } from '@/components/yaml-editor'
 
 export function DeploymentDetail(props: { namespace: string; name: string }) {
@@ -324,10 +324,9 @@ export function DeploymentDetail(props: { namespace: string; name: string }) {
           </p>
         </div>
         <div className="flex w-full flex-wrap gap-2 md:w-auto md:justify-end">
-          <Button variant="outline" size="sm" onClick={handleRefresh}>
-            <IconRefresh className="w-4 h-4" />
+          <RefreshButton variant="outline" size="sm" onClick={handleRefresh}>
             {t('detail.buttons.refresh')}
-          </Button>
+          </RefreshButton>
           <DescribeDialog
             resourceType="deployments"
             namespace={namespace}

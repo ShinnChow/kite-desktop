@@ -13,7 +13,6 @@ import {
   IconMap,
   IconNetwork,
   IconPlayerPlay,
-  IconRefresh,
   IconRocket,
   IconRoute,
   IconRouter,
@@ -46,7 +45,7 @@ import {
 } from '@/components/ui/select'
 import { useCluster } from '@/hooks/use-cluster'
 import { useFavorites } from '@/hooks/use-favorites'
-import { cn } from '@/lib/utils'
+import { RefreshButton } from '@/components/refresh-button'
 
 const RESOURCE_CONFIG: Record<
   string,
@@ -251,16 +250,13 @@ export function FavoritesPage() {
             {t('favorites.currentCluster', { name: currentCluster })}
           </p>
         </div>
-        <Button
+        <RefreshButton
           variant="outline"
           onClick={() => void refreshFavorites()}
           disabled={isLoading}
         >
-          <IconRefresh
-            className={cn('mr-2 h-4 w-4', isLoading ? 'animate-spin' : '')}
-          />
           {t('common.refresh')}
-        </Button>
+        </RefreshButton>
       </div>
 
       <div className="rounded-xl border bg-card/70 p-4 shadow-sm">

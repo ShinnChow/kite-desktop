@@ -3,7 +3,6 @@ import {
   IconFolderOpen,
   IconInfoCircle,
   IconLogs,
-  IconRefresh,
 } from '@tabler/icons-react'
 import { toast } from 'sonner'
 import { useTranslation } from 'react-i18next'
@@ -14,6 +13,7 @@ import {
   openLogsDir,
   type DesktopAppInfo,
 } from '@/lib/desktop'
+import { RefreshButton } from '@/components/refresh-button'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
@@ -109,10 +109,9 @@ export function DesktopManagement() {
               'Open Logs Directory'
             )}
           </Button>
-          <Button variant="ghost" onClick={() => void loadInfo()}>
-            <IconRefresh className="mr-2 h-4 w-4" />
+          <RefreshButton variant="ghost" onClick={() => void loadInfo()}>
             {t('desktopManagement.actions.refresh', 'Refresh')}
-          </Button>
+          </RefreshButton>
         </div>
 
         {loading && !info ? (
