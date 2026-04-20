@@ -1,6 +1,26 @@
 // API client with authentication support
 import { withSubPath } from './subpath'
 
+export interface APIErrorOptions {
+  code?: string
+  detail?: string
+  status?: number
+}
+
+export class APIError extends Error {
+  code?: string
+  detail?: string
+  status?: number
+
+  constructor(message: string, options: APIErrorOptions = {}) {
+    super(message)
+    this.name = 'APIError'
+    this.code = options.code
+    this.detail = options.detail
+    this.status = options.status
+  }
+}
+
 class ApiClient {
   private baseUrl: string = ''
   private getCurrentCluster: (() => string | null) | null = null
@@ -44,13 +64,24 @@ class ApiClient {
       const response = await fetch(fullUrl, defaultOptions)
 
       if (response.status === 401) {
-        throw new Error('Unauthorized')
+        throw new APIError('Unauthorized', { status: 401 })
       }
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
-        throw new Error(
-          errorData.error || `HTTP error! status: ${response.status}`
+        throw new APIError(
+          errorData.error || `HTTP error! status: ${response.status}`,
+          {
+            code:
+              typeof errorData.errorCode === 'string'
+                ? errorData.errorCode
+                : undefined,
+            detail:
+              typeof errorData.errorDetail === 'string'
+                ? errorData.errorDetail
+                : undefined,
+            status: response.status,
+          }
         )
       }
 

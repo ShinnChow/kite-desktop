@@ -694,7 +694,18 @@
       "testRequired": "Test the cluster connection before adding it.",
       "testSuccess": "Connection successful.",
       "testSuccessWithVersion": "Connection successful. Kubernetes version: {{version}}",
+      "testErrorWithDetail": "{{message}} Details: {{detail}}",
       "testError": "Cluster connection test failed",
+      "testErrors": {
+        "timeout": "Connection test timed out. Please check the Kubernetes API Server address, network, VPN/proxy, or firewall settings.",
+        "dns": "Failed to resolve the Kubernetes API Server host. Please check the server address and DNS settings.",
+        "refused": "The Kubernetes API Server refused the connection. Please confirm the server address, port, and local network access.",
+        "tls": "TLS certificate validation failed. Please check the kubeconfig CA, certificate, or server address.",
+        "unauthorized": "Authentication failed. Please check the kubeconfig user credentials, token, or client certificate.",
+        "forbidden": "The current kubeconfig can reach the cluster, but it is not allowed to query cluster version.",
+        "invalidConfig": "The kubeconfig is invalid or incomplete. Please check the cluster, user, and context configuration.",
+        "inClusterUnavailable": "In-cluster configuration is unavailable in the current environment."
+      },
       "createError": "Failed to create cluster",
       "updateError": "Failed to update cluster",
       "deleteError": "Failed to delete cluster"

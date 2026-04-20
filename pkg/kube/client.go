@@ -48,6 +48,8 @@ type K8sClient struct {
 	cancel context.CancelFunc
 }
 
+const cacheSyncTimeout = 20 * time.Second
+
 // NewClient creates a K8sClient from a rest.Config
 func NewClient(config *rest.Config) (*K8sClient, error) {
 	clientset, err := kubernetes.NewForConfig(config)
@@ -60,7 +62,7 @@ func NewClient(config *rest.Config) (*K8sClient, error) {
 		klog.Warningf("failed to create metrics client: %v", err)
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	runCtx, cancel := context.WithCancel(context.Background())
 	cacheEnabled := os.Getenv("DISABLE_CACHE") != "true"
 
 	var c client.Client
@@ -90,7 +92,7 @@ func NewClient(config *rest.Config) (*K8sClient, error) {
 		}
 
 		// Add field indexer for Pod spec.nodeName to enable efficient querying by node
-		if err := mgr.GetFieldIndexer().IndexField(ctx, &corev1.Pod{}, "spec.nodeName", func(rawObj client.Object) []string {
+		if err := mgr.GetFieldIndexer().IndexField(runCtx, &corev1.Pod{}, "spec.nodeName", func(rawObj client.Object) []string {
 			pod := rawObj.(*corev1.Pod)
 			if pod.Spec.NodeName == "" {
 				return nil
@@ -101,13 +103,19 @@ func NewClient(config *rest.Config) (*K8sClient, error) {
 			return nil, fmt.Errorf("failed to create field indexer for spec.nodeName: %w", err)
 		}
 		go func() {
-			if err := mgr.Start(ctx); err != nil {
+			if err := mgr.Start(runCtx); err != nil {
 				fmt.Printf("Error starting manager: %v\n", err)
 			}
 		}()
-		if !mgr.GetCache().WaitForCacheSync(ctx) {
+
+		syncCtx, cancelSync := context.WithTimeout(runCtx, cacheSyncTimeout)
+		defer cancelSync()
+		if !mgr.GetCache().WaitForCacheSync(syncCtx) {
 			cancel()
-			return nil, fmt.Errorf("failed to wait for cache sync")
+			if err := syncCtx.Err(); err != nil {
+				return nil, fmt.Errorf("failed to wait for cache sync within %s: %w", cacheSyncTimeout, err)
+			}
+			return nil, fmt.Errorf("failed to wait for cache sync within %s", cacheSyncTimeout)
 		}
 		c = mgr.GetClient()
 	}
