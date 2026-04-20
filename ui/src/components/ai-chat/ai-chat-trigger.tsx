@@ -3,9 +3,9 @@ import { Bot } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
+import { ShortcutTooltipContent } from '@/components/shortcut-tooltip-content'
 import {
   Tooltip,
-  TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 
@@ -177,14 +177,11 @@ export function AIChatTrigger({
           <Bot className="h-5 w-5" />
         </Button>
       </TooltipTrigger>
-      <TooltipContent side="left" className="flex flex-col gap-0.5">
-        <span>{t('aiChat.title')}</span>
-        {shortcutLabel ? (
-          <kbd className="mt-0.5 inline-flex w-fit items-center rounded-sm border border-primary-foreground/25 bg-primary-foreground/14 px-1.5 py-0.5 font-mono text-[11px] font-medium tracking-wide text-primary-foreground shadow-none">
-            {shortcutLabel}
-          </kbd>
-        ) : null}
-      </TooltipContent>
+      <ShortcutTooltipContent
+        side="left"
+        label={t('aiChat.title')}
+        shortcut={shortcutLabel}
+      />
     </Tooltip>
   )
 }

@@ -14,9 +14,17 @@ import {
 } from '@/components/ui/dropdown-menu'
 import {
   Tooltip,
-  TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import { ShortcutTooltipContent } from '@/components/shortcut-tooltip-content'
+
+function getClusterSwitchShortcutLabel() {
+  if (typeof navigator !== 'undefined' && /mac/i.test(navigator.platform)) {
+    return '⌘⇧K'
+  }
+
+  return 'Ctrl+Shift+K'
+}
 
 export function ClusterSelector() {
   const { t } = useTranslation()
@@ -70,9 +78,11 @@ export function ClusterSelector() {
             </Button>
           </DropdownMenuTrigger>
         </TooltipTrigger>
-        <TooltipContent side="top">
-          {t('clusterSelector.quickSwitchHint')}
-        </TooltipContent>
+        <ShortcutTooltipContent
+          side="top"
+          label={t('clusterSelector.quickSwitch')}
+          shortcut={getClusterSwitchShortcutLabel()}
+        />
       </Tooltip>
       <DropdownMenuContent align="end" className="w-60">
         {clusters.length === 0 ? (
@@ -89,7 +99,7 @@ export function ClusterSelector() {
           <DropdownMenuLabel className="flex items-center justify-between gap-2">
             <span>{t('clusterSelector.quickSwitch')}</span>
             <kbd className="bg-muted text-muted-foreground pointer-events-none flex h-5 items-center justify-center rounded border px-1 font-sans text-[0.7rem] font-medium">
-              ⌘⇧K
+              {getClusterSwitchShortcutLabel()}
             </kbd>
           </DropdownMenuLabel>
         ) : null}
