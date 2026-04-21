@@ -13,92 +13,102 @@
 [![GitHub license](https://img.shields.io/github/license/eryajf/kite-desktop)](https://github.com/eryajf/kite-desktop/blob/main/LICENSE)
 [![Commits](https://img.shields.io/github/commit-activity/m/eryajf/kite-desktop?color=ffff00)](https://github.com/eryajf/kite-desktop/commits/main)
 
-<p> 🪁 一个基于 Wails v3 打造、面向桌面端的 K8S 多集群管理工具 🪁</p>
+<p> 🪁 A Wails v3-based desktop tool for multi-cluster K8S management 🪁</p>
 
 <img src="https://cdn.jsdelivr.net/gh/eryajf/tu@main/img/image_20240420_214408.gif" width="800"  height="3">
 </div><br>
 
 <p align="center">
   <a href="" rel="noopener">
- <img src="https://cdn.jsdelivr.net/gh/eryajf/tu/img/image_20260415_222917.png" alt="Project logo"></a>
+ <img src="https://cdn.jsdelivr.net/gh/eryajf/tu/img/image_20260415_222836.png" alt="Project logo"></a>
 </p>
 
-## 致谢
+## Acknowledgement
 
-当前项目基于原始开源项目 [Kite](https://github.com/kite-org/kite) 改造而来。
+This project is based on the original open source project [Kite](https://github.com/kite-org/kite).
 
-首先感谢原项目 Kite 的作者与所有贡献者。原项目已经提供了非常坚实的基础，包括 Kubernetes 资源管理能力、集群管理流程、后端能力以及整体产品方向。当前仓库的桌面化改造，正是建立在这些成果之上。
+First, thanks to the original Kite authors and all contributors. The upstream project already provided a very solid foundation, including Kubernetes resource management, cluster management workflows, backend capabilities, and the overall product direction. The desktop transformation in this repository is built directly on top of those results.
 
-## 为什么会有这个仓库
+## Why This Repository Exists
 
-`Kite Desktop` 并不是对原仓库的简单镜像，也不是只做了一层外壳包装。
+`Kite Desktop` is not a simple mirror of the original repository, nor is it just a thin shell around it.
 
-当前项目是在原始 Kite 基础上进行桌面端方向“魔改”的产物，目标是把原本偏 Web / Server 形态的能力，逐步重构为一个真正可安装、可分发、可本地使用的桌面端 Kubernetes 管理工具。同时在 AI 智能融合方面做更多更深入的探索。
+This project is the result of a substantial desktop-oriented rework based on the original Kite. The goal is to gradually reshape what was originally more Web / Server oriented into a truly installable, distributable, locally usable desktop Kubernetes management tool. At the same time, the project will explore deeper integration with AI capabilities.
 
-## 技术栈
+For users in mainland China, the mirror repository is recommended: <https://cnb.cool/eryajf/kite-desktop>
 
-当前桌面版的核心技术栈为：
+## Tech Stack
 
-- `Go`：负责核心逻辑与 Kubernetes 交互能力
-- `React`：负责桌面应用界面
-- `Wails v3`：负责桌面运行时、原生窗口、系统能力接入，以及 macOS / Windows 安装包构建
+The current desktop edition is built on the following core stack:
 
-其中，`Wails v3` 是这次改造的关键基础设施。后续围绕桌面端的很多能力都会基于它展开，例如：
+- `Go` for backend logic and Kubernetes integration
+- `React` for the application UI
+- `Wails v3` for desktop runtime, native windowing, system integration, and desktop packaging
 
-- 原生窗口行为适配
-- 本地文件访问
-- 系统文件选择器
-- 外链与系统浏览器联动
-- 桌面安装包构建与发布
+Among them, `Wails v3` is the key infrastructure behind this transformation. Many future desktop capabilities will be built on top of it, such as:
 
-## 当前项目方向
+- native window behavior adaptations
+- local file access
+- system file pickers
+- external link handling with the system browser
+- desktop package building and release workflows
 
-从现在开始，这个仓库会逐步与原始 Kite 仓库分离，单独围绕桌面端场景持续演进。
+## Project Direction
 
-这意味着：
+From now on, this repository will gradually separate from the original Kite repository and continue evolving independently around desktop use cases.
 
-- 会继续增强桌面端原生能力
-- 会根据桌面使用场景调整交互与功能边界
-- 对不再适合桌面端的部分进行裁剪、重构或替换
-- 针对桌面端新增更有价值的能力
-- 单独建设桌面应用的发布、安装与升级体系
+That means:
 
-## 开发方式
+- desktop-native capabilities will continue to be enhanced
+- interaction flows and feature boundaries will be adjusted for desktop usage scenarios
+- parts that are no longer suitable for desktop will be trimmed, refactored, or replaced
+- new capabilities with stronger desktop value will be introduced
+- a dedicated release, installation, and upgrade system for the desktop app will be built
 
-安装依赖：
+## Development
+
+Install dependencies:
 
 ```bash
 make deps
 ```
 
-启动桌面开发环境：
+Run the desktop app in development mode:
 
 ```bash
 make dev
 ```
 
-构建桌面应用：
+Build the desktop app:
 
 ```bash
 make build
 ```
 
-## 发布方向
+## Release Targets
 
-当前项目将以桌面安装包作为主要交付形态，逐步完善以下平台支持：
+The project will primarily be delivered as desktop installation packages, with gradual support for the following platforms:
 
 - macOS Intel
 - macOS Apple Silicon
 - Windows x64
 - Windows ARM64
 
-## 数据分析与隐私文档
+## ☕ Sponsorship & Support
 
-如果你需要查看桌面版应用数据分析隐私说明，可参考以下文档：
+If you find this software useful and want to support its continued development, you can sponsor it here:
 
-- [应用数据分析隐私协议](./docs/desktop-analytics-privacy-notice.md)
+| Ko-fi *outside mainland China*                                                                               |     | WeChat donation *mainland China*                 |
+|--------------------------------------------------------------------------------------------------------------|-----|--------------------------------------------------|
+| [<img src="https://t.eryajf.net/imgs/2026/04/1776783161570.png" alt="BuyMeACoffee" height="150">](https://ko-fi.com/eryajf) | or  | <img src="https://t.eryajf.net/imgs/2023/01/834f12107ebc432a.png" height="150"> |
 
-## 许可证
+## Analytics Privacy
 
-本仓库使用 `AGPL-3.0-only`，详见 [LICENSE](./LICENSE)。
->注意：当前仓库基于上游 `Kite` 深度改造而来，仓库内仍可能包含继承自上游的 `Apache-2.0` 代码与署名义务，相关说明见 [NOTICE](./NOTICE) 与 [licenses/Apache-2.0.txt](./licenses/Apache-2.0.txt)
+If you need the privacy notice for desktop analytics, see:
+
+- [Desktop Analytics Privacy Notice](./docs/desktop-analytics-privacy-notice.md)
+
+## License
+
+This repository is licensed under `AGPL-3.0-only`. See [LICENSE](./LICENSE) for details.
+> Note: this repository is a deeply modified derivative of the upstream `Kite` project. It may still contain code inherited from upstream under `Apache-2.0`, along with the corresponding attribution obligations. See [NOTICE](./NOTICE) and [licenses/Apache-2.0.txt](./licenses/Apache-2.0.txt).
