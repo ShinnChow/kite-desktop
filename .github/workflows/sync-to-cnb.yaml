@@ -5,7 +5,7 @@ name: Mirror to CNB
 on:
   push:
     branches:
-      - '**'       # 所有分支的推送都会触发
+      - main
     tags:
       - '**'       # 所有标签的推送都会触发
   delete:           # 分支或标签删除时也同步
