@@ -1,4 +1,8 @@
 // API client with authentication support
+import {
+  appendClusterNameParam,
+  stripClusterNameHeader,
+} from './cluster-transport'
 import { withSubPath } from './subpath'
 
 export interface APIErrorOptions {
@@ -42,17 +46,17 @@ class ApiClient {
     const headers: Record<string, string> = {
       ...(options.headers as Record<string, string>),
     }
+    const explicitClusterName = stripClusterNameHeader(headers)
 
     // Only set default Content-Type to application/json if not already set and body is not FormData
     if (!headers['Content-Type'] && !(options.body instanceof FormData)) {
       headers['Content-Type'] = 'application/json'
     }
 
-    // Add cluster header if available
-    const currentCluster = this.getCurrentCluster?.()
-    if (currentCluster) {
-      headers['x-cluster-name'] = currentCluster
-    }
+    const requestUrl = appendClusterNameParam(
+      fullUrl,
+      explicitClusterName ?? this.getCurrentCluster?.()
+    )
 
     const defaultOptions: RequestInit = {
       credentials: 'include',
@@ -61,7 +65,7 @@ class ApiClient {
     }
 
     try {
-      const response = await fetch(fullUrl, defaultOptions)
+      const response = await fetch(requestUrl, defaultOptions)
 
       if (response.status === 401) {
         throw new APIError('Unauthorized', { status: 401 })

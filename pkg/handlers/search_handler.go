@@ -220,6 +220,5 @@ func getSearchClusterName(c *gin.Context) string {
 	if clusterName, ok := c.GetQuery(middleware.ClusterNameHeader); ok {
 		return clusterName
 	}
-	clusterName, _ := c.Cookie(middleware.ClusterNameHeader)
-	return clusterName
+	return middleware.ReadClusterNameCookie(c)
 }

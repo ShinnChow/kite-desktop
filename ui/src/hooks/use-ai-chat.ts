@@ -11,6 +11,7 @@ import {
   listChatSessions,
   upsertChatSession,
 } from '@/lib/api/ai-history'
+import { appendClusterNameParam } from '@/lib/cluster-transport'
 import { withSubPath } from '@/lib/subpath'
 
 export interface ChatMessage {
@@ -897,26 +898,28 @@ export function useAIChat() {
       const clusterName = localStorage.getItem('current-cluster') || ''
       const requestLanguage = (language || '').trim() || 'en'
 
-      const response = await fetch(withSubPath('/api/v1/ai/chat'), {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept-Language': requestLanguage,
-          'x-cluster-name': clusterName,
-        },
-        body: JSON.stringify({
-          messages: apiMessages,
-          language: requestLanguage,
-          page_context: {
-            page: pageContext.page,
-            namespace: pageContext.namespace,
-            resource_name: pageContext.resourceName,
-            resource_kind: pageContext.resourceKind,
+      const response = await fetch(
+        appendClusterNameParam(withSubPath('/api/v1/ai/chat'), clusterName),
+        {
+          method: 'POST',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept-Language': requestLanguage,
           },
-        }),
-        signal: abortSignal,
-      })
+          body: JSON.stringify({
+            messages: apiMessages,
+            language: requestLanguage,
+            page_context: {
+              page: pageContext.page,
+              namespace: pageContext.namespace,
+              resource_name: pageContext.resourceName,
+              resource_kind: pageContext.resourceKind,
+            },
+          }),
+          signal: abortSignal,
+        }
+      )
 
       if (!response.ok) {
         const errData = await response.json().catch(() => ({}))
@@ -1084,13 +1087,15 @@ export function useAIChat() {
           abortControllerRef.current = new AbortController()
 
           const response = await fetch(
-            withSubPath('/api/v1/ai/execute/continue'),
+            appendClusterNameParam(
+              withSubPath('/api/v1/ai/execute/continue'),
+              clusterName
+            ),
             {
               method: 'POST',
               credentials: 'include',
               headers: {
                 'Content-Type': 'application/json',
-                'x-cluster-name': clusterName,
               },
               body: JSON.stringify({ sessionId }),
               signal: abortControllerRef.current.signal,
@@ -1227,13 +1232,15 @@ export function useAIChat() {
           abortControllerRef.current = new AbortController()
 
           const response = await fetch(
-            withSubPath('/api/v1/ai/input/continue'),
+            appendClusterNameParam(
+              withSubPath('/api/v1/ai/input/continue'),
+              clusterName
+            ),
             {
               method: 'POST',
               credentials: 'include',
               headers: {
                 'Content-Type': 'application/json',
-                'x-cluster-name': clusterName,
               },
               body: JSON.stringify({ sessionId, values }),
               signal: abortControllerRef.current.signal,
