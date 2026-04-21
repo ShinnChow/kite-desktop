@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 
 import { trackEvent } from '@/lib/analytics'
 import { getCurrentAnalyticsPageKey } from '@/lib/analytics-route'
+import { clearClusterCookie, setClusterCookie } from '@/lib/cluster-cookie'
 import { Cluster } from '@/types/api'
 import { clusterQueryKey } from '@/lib/cluster-query'
 import { withSubPath } from '@/lib/subpath'
@@ -49,11 +50,10 @@ export const ClusterProvider: React.FC<{ children: React.ReactNode }> = ({
 
   useEffect(() => {
     if (currentCluster) {
-      document.cookie = `x-cluster-name=${currentCluster}; path=/`
+      setClusterCookie(currentCluster)
       return
     }
-    document.cookie =
-      'x-cluster-name=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
+    clearClusterCookie()
   }, [currentCluster])
 
   // Fetch clusters from API (this request shouldn't need cluster header)
@@ -96,20 +96,19 @@ export const ClusterProvider: React.FC<{ children: React.ReactNode }> = ({
       const defaultCluster = clusters.find((c) => c.isDefault)
       if (defaultCluster) {
         setCurrentClusterState(defaultCluster.name)
-        document.cookie = `x-cluster-name=${defaultCluster.name}; path=/`
+        setClusterCookie(defaultCluster.name)
         localStorage.setItem('current-cluster', defaultCluster.name)
       } else {
         // If no default cluster, use the first one
         setCurrentClusterState(clusters[0].name)
         localStorage.setItem('current-cluster', clusters[0].name)
-        document.cookie = `x-cluster-name=${clusters[0].name}; path=/`
+        setClusterCookie(clusters[0].name)
       }
     }
     if (clusters.length === 0 && currentCluster) {
       setCurrentClusterState(null)
       localStorage.removeItem('current-cluster')
-      document.cookie =
-        'x-cluster-name=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
+      clearClusterCookie()
     }
     if (
       currentCluster &&
@@ -119,8 +118,7 @@ export const ClusterProvider: React.FC<{ children: React.ReactNode }> = ({
       // If current cluster is not in the list, reset it
       setCurrentClusterState(null)
       localStorage.removeItem('current-cluster')
-      document.cookie =
-        'x-cluster-name=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
+      clearClusterCookie()
     }
   }, [clusters, currentCluster])
 
@@ -131,7 +129,7 @@ export const ClusterProvider: React.FC<{ children: React.ReactNode }> = ({
         setCurrentClusterState(clusterName)
         localStorage.setItem('current-cluster', clusterName)
         saveRecentCluster(clusterName)
-        document.cookie = `x-cluster-name=${clusterName}; path=/`
+        setClusterCookie(clusterName)
         trackEvent('cluster_switch', {
           runtime: 'desktop',
           page: getCurrentAnalyticsPageKey(),

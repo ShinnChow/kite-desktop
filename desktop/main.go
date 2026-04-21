@@ -20,15 +20,20 @@ import (
 var assets embed.FS
 
 func main() {
-	if err := waitForFrontendDevServer(); err != nil {
-		failDesktopStartup(err)
-	}
-
 	paths, err := resolveDesktopPaths()
 	if err != nil {
 		failDesktopStartup(err)
 	}
 	if err := paths.ensure(); err != nil {
+		failDesktopStartup(err)
+	}
+	cleanupLogging, err := setupDesktopLogging(paths)
+	if err != nil {
+		failDesktopStartup(err)
+	}
+	defer cleanupLogging()
+
+	if err := waitForFrontendDevServer(); err != nil {
 		failDesktopStartup(err)
 	}
 

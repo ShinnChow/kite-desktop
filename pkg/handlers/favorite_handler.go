@@ -96,6 +96,5 @@ func getPreferenceClusterName(c *gin.Context) string {
 			return trimmed
 		}
 	}
-	clusterName, _ := c.Cookie(middleware.ClusterNameHeader)
-	return strings.TrimSpace(clusterName)
+	return middleware.ReadClusterNameCookie(c)
 }
