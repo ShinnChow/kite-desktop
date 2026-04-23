@@ -1012,7 +1012,7 @@ func buildApplicationMenu(h *desktopHost, devMode bool) *application.Menu {
 		h.navigate("/settings")
 	})
 	appMenu.AddSeparator()
-	appMenu.Add("Quit").OnClick(func(ctx *application.Context) {
+	appMenu.Add("Quit").SetAccelerator("CmdOrCtrl+q").OnClick(func(ctx *application.Context) {
 		if h == nil {
 			return
 		}
