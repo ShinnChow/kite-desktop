@@ -1068,7 +1068,9 @@ func buildApplicationMenu(h *desktopHost, devMode bool) *application.Menu {
 	editMenu.AddSeparator()
 	editMenu.AddRole(application.Cut)
 	editMenu.AddRole(application.Copy)
-	editMenu.AddRole(application.Paste)
+	if runtime.GOOS != "windows" {
+		editMenu.AddRole(application.Paste)
+	}
 	if runtime.GOOS == "darwin" {
 		editMenu.AddRole(application.PasteAndMatchStyle)
 		editMenu.AddRole(application.Delete)
