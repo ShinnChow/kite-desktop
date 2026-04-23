@@ -190,6 +190,9 @@ func TestBuildApplicationMenuIncludesEditMenu(t *testing.T) {
 	if menu.FindByRole(application.Copy) == nil {
 		t.Fatal("expected application menu to include standard clipboard shortcuts")
 	}
+	if runtime.GOOS == "windows" && menu.FindByRole(application.Paste) != nil {
+		t.Fatal("expected Windows menu to leave Paste shortcut to WebView2")
+	}
 }
 
 func TestDesktopHostSetNavigationMenuState(t *testing.T) {
