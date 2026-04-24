@@ -46,6 +46,9 @@ const (
 	aiSidecarGap          = 0
 	aiSidecarSideRight    = "right"
 	aiSidecarSideLeft     = "left"
+	settingsGeneralRoute  = "/settings?tab=general"
+	settingsDesktopRoute  = "/settings?tab=desktop"
+	settingsAboutRoute    = "/settings?tab=about"
 )
 
 func desktopApplicationIcon() []byte {
@@ -238,6 +241,12 @@ func (h *desktopHost) mainWindowOptions() application.WebviewWindowOptions {
 func (h *desktopHost) registerMainWindow(window *application.WebviewWindow) {
 	h.mainWindow = window
 	h.bindWindowName(window, mainWindowName)
+	window.RegisterKeyBinding("CmdOrCtrl+W", func(_ application.Window) {
+		if h.quitting.Load() {
+			return
+		}
+		window.Close()
+	})
 
 	window.RegisterHook(events.Common.WindowClosing, func(event *application.WindowEvent) {
 		h.closeAISidecar()
@@ -806,9 +815,8 @@ func (h *desktopHost) navigate(route string) {
 	if h.mainWindow == nil {
 		return
 	}
-	target := appRoute(route)
-	h.mainWindow.ExecJS(fmt.Sprintf("window.location.assign(%s)", strconv.Quote(target)))
 	h.focusMainWindow()
+	h.mainWindow.SetURL(appURL(h.baseURL, route))
 }
 
 func (h *desktopHost) openExternalURL(rawURL string) error {
@@ -999,18 +1007,14 @@ func buildApplicationMenu(h *desktopHost, devMode bool) *application.Menu {
 		if h == nil {
 			return
 		}
-		info := h.appInfo()
-		h.showInfoDialog(
-			"About Kite",
-			fmt.Sprintf("Kite Desktop\nVersion: %s\nBuild Date: %s\nCommit: %s\nConfig Dir: %s", info.Version, info.BuildDate, info.CommitID, info.Paths.ConfigDir),
-		)
+		h.navigate(settingsAboutRoute)
 	})
 	appMenu.Add("Preferences").OnClick(func(ctx *application.Context) {
 		if h == nil {
 			return
 		}
-		h.navigate("/settings")
-	})
+		h.navigate(settingsGeneralRoute)
+	}).SetAccelerator("CmdOrCtrl+,")
 	appMenu.AddSeparator()
 	appMenu.Add("Quit").SetAccelerator("CmdOrCtrl+q").OnClick(func(ctx *application.Context) {
 		if h == nil {
@@ -1123,7 +1127,14 @@ func buildApplicationMenu(h *desktopHost, devMode bool) *application.Menu {
 	windowMenu := menu.AddSubmenu("Window")
 	windowMenu.AddRole(application.Minimise)
 	windowMenu.AddRole(application.Zoom)
-	if runtime.GOOS != "darwin" {
+	if runtime.GOOS == "darwin" {
+		windowMenu.Add("Close Window").SetAccelerator("CmdOrCtrl+W").OnClick(func(ctx *application.Context) {
+			if h == nil {
+				return
+			}
+			h.hideMainWindow()
+		})
+	} else {
 		windowMenu.AddRole(application.CloseWindow)
 	}
 
@@ -1155,6 +1166,68 @@ func (h *desktopHost) setupApplicationMenu() {
 	h.app.Menu.SetApplicationMenu(menu)
 }
 
+func buildTrayMenu(h *desktopHost) *application.Menu {
+	menu := application.NewMenu()
+	menu.Add("Show Kite").OnClick(func(ctx *application.Context) {
+		if h == nil {
+			return
+		}
+		h.focusMainWindow()
+	})
+	menu.Add("Settings").OnClick(func(ctx *application.Context) {
+		if h == nil {
+			return
+		}
+		h.navigate(settingsGeneralRoute)
+	})
+	menu.Add("Desktop Settings").OnClick(func(ctx *application.Context) {
+		if h == nil {
+			return
+		}
+		h.navigate(settingsDesktopRoute)
+	})
+	menu.Add("About Kite").OnClick(func(ctx *application.Context) {
+		if h == nil {
+			return
+		}
+		h.navigate(settingsAboutRoute)
+	})
+	menu.Add("Import kubeconfig").OnClick(func(ctx *application.Context) {
+		if h == nil {
+			return
+		}
+		if err := h.importKubeconfigFromDialog(); err != nil {
+			h.showErrorDialog("Import kubeconfig failed", err.Error())
+			return
+		}
+		h.reloadMainWindow()
+	})
+	menu.Add("Open Config Directory").OnClick(func(ctx *application.Context) {
+		if h == nil {
+			return
+		}
+		if err := h.openConfigDir(); err != nil {
+			h.showErrorDialog("Open config directory failed", err.Error())
+		}
+	})
+	menu.Add("Open Logs Directory").OnClick(func(ctx *application.Context) {
+		if h == nil {
+			return
+		}
+		if err := h.openLogsDir(); err != nil {
+			h.showErrorDialog("Open logs directory failed", err.Error())
+		}
+	})
+	menu.AddSeparator()
+	menu.Add("Quit").OnClick(func(ctx *application.Context) {
+		if h == nil {
+			return
+		}
+		h.quit()
+	})
+	return menu
+}
+
 func (h *desktopHost) setupSystemTray() {
 	tray := h.app.SystemTray.New()
 	tray.SetTooltip("Kite")
@@ -1165,33 +1238,7 @@ func (h *desktopHost) setupSystemTray() {
 		tray.SetIcon(desktopTrayIcon)
 	}
 
-	menu := h.app.NewMenu()
-	menu.Add("Show Kite").OnClick(func(ctx *application.Context) {
-		h.focusMainWindow()
-	})
-	menu.Add("Import kubeconfig").OnClick(func(ctx *application.Context) {
-		if err := h.importKubeconfigFromDialog(); err != nil {
-			h.showErrorDialog("Import kubeconfig failed", err.Error())
-			return
-		}
-		h.reloadMainWindow()
-	})
-	menu.Add("Open Config Directory").OnClick(func(ctx *application.Context) {
-		if err := h.openConfigDir(); err != nil {
-			h.showErrorDialog("Open config directory failed", err.Error())
-		}
-	})
-	menu.Add("Open Logs Directory").OnClick(func(ctx *application.Context) {
-		if err := h.openLogsDir(); err != nil {
-			h.showErrorDialog("Open logs directory failed", err.Error())
-		}
-	})
-	menu.AddSeparator()
-	menu.Add("Quit").OnClick(func(ctx *application.Context) {
-		h.quit()
-	})
-
-	tray.SetMenu(menu)
+	tray.SetMenu(buildTrayMenu(h))
 	tray.OnClick(func() {
 		h.focusMainWindow()
 	})
@@ -1230,6 +1277,10 @@ func appRoute(route string) string {
 		return common.Base + "/"
 	}
 	return common.Base + route
+}
+
+func appURL(baseURL, route string) string {
+	return strings.TrimRight(baseURL, "/") + appRoute(route)
 }
 
 func apiPath(route string) string {
