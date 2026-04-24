@@ -1,12 +1,12 @@
 package main
 
 import (
-	"net"
+	"io"
 	"net/http"
-	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -170,8 +170,14 @@ func TestBuildApplicationMenuIncludesEditMenu(t *testing.T) {
 	if menu.FindByLabel("Preferences") == nil {
 		t.Fatal("expected application menu to include Preferences entry")
 	}
-	if preferences := menu.FindByLabel("Preferences"); preferences.GetAccelerator() != "Cmd+," {
-		t.Fatalf("expected Preferences accelerator to be Cmd+,, got %q", preferences.GetAccelerator())
+	if preferences := menu.FindByLabel("Preferences"); preferences != nil {
+		expectedAccelerator := "Cmd+,"
+		if runtime.GOOS != "darwin" {
+			expectedAccelerator = "Ctrl+,"
+		}
+		if preferences.GetAccelerator() != expectedAccelerator {
+			t.Fatalf("expected Preferences accelerator to be %q, got %q", expectedAccelerator, preferences.GetAccelerator())
+		}
 	}
 	if menu.FindByLabel("Edit") == nil {
 		t.Fatal("expected application menu to include an Edit submenu")
@@ -315,17 +321,6 @@ func TestDesktopUpdateStateStoreClearsReadyStateAfterAppliedVersion(t *testing.T
 }
 
 func TestDesktopHostDownloadUpdateCreatesReadyState(t *testing.T) {
-	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, _ = w.Write([]byte("kite update payload"))
-	}))
-	listener, err := net.Listen("tcp4", "127.0.0.1:0")
-	if err != nil {
-		t.Fatalf("net.Listen() error = %v", err)
-	}
-	server.Listener = listener
-	server.Start()
-	defer server.Close()
-
 	baseDir := t.TempDir()
 	paths := desktopPaths{
 		DataDir:         baseDir,
@@ -341,7 +336,15 @@ func TestDesktopHostDownloadUpdateCreatesReadyState(t *testing.T) {
 	}
 
 	host := newDesktopHost(nil, "", paths)
-	err = host.updateStore.saveCheckResult(kiteversion.UpdateCheckInfo{
+	host.updateClient = &http.Client{Transport: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+		return &http.Response{
+			StatusCode:    http.StatusOK,
+			ContentLength: int64(len("kite update payload")),
+			Body:          io.NopCloser(strings.NewReader("kite update payload")),
+			Header:        make(http.Header),
+		}, nil
+	})}
+	err := host.updateStore.saveCheckResult(kiteversion.UpdateCheckInfo{
 		CurrentVersion: "0.1.1",
 		LatestVersion:  "0.1.2",
 		Comparison:     kiteversion.UpdateComparisonUpdateAvailable,
@@ -349,7 +352,7 @@ func TestDesktopHostDownloadUpdateCreatesReadyState(t *testing.T) {
 		AssetAvailable: true,
 		Asset: &kiteversion.UpdateAsset{
 			Name:        "Kite-v0.1.2-macos-arm64.dmg",
-			DownloadURL: server.URL,
+			DownloadURL: "https://updates.example.com/Kite-v0.1.2-macos-arm64.dmg",
 		},
 	})
 	if err != nil {
@@ -428,4 +431,10 @@ func TestNewDesktopHostClearsAppliedReadyStateOnStartup(t *testing.T) {
 	if state.ReadyToApply != nil {
 		t.Fatalf("ReadyToApply = %#v, want nil", state.ReadyToApply)
 	}
+}
+
+type roundTripperFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return f(req)
 }

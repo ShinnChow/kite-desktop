@@ -90,6 +90,7 @@ type desktopHost struct {
 	stateStore      *desktopWindowStateStore
 	updateStore     *desktopUpdateStateStore
 	downloadManager *desktopUpdateDownloadManager
+	updateClient    *http.Client
 
 	mainWindow  *application.WebviewWindow
 	aiSidecar   *application.WebviewWindow
@@ -183,6 +184,7 @@ func newDesktopHost(app *application.App, baseURL string, paths desktopPaths) *d
 		stateStore:      newDesktopWindowStateStore(paths.WindowStatePath),
 		updateStore:     updateStore,
 		downloadManager: newDesktopUpdateDownloadManager(),
+		updateClient:    http.DefaultClient,
 	}
 }
 
@@ -982,14 +984,6 @@ func (h *desktopHost) importKubeconfigContent(content string) error {
 	}
 
 	return nil
-}
-
-func (h *desktopHost) showInfoDialog(title, message string) {
-	dialog := h.app.Dialog.Info().SetTitle(title).SetMessage(message)
-	if h.mainWindow != nil {
-		dialog.AttachToWindow(h.mainWindow)
-	}
-	dialog.Show()
 }
 
 func (h *desktopHost) showErrorDialog(title, message string) {
