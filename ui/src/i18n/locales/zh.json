@@ -696,7 +696,14 @@
       "description": "配置使用数据分析和版本检查。数据分析默认开启，关闭数据分析不会关闭版本检查。",
       "form": {
         "enableAnalytics": "启用数据分析",
-        "enableVersionCheck": "启用版本检查"
+        "enableVersionCheck": "启用版本检查",
+        "updateSource": "更新下载源",
+        "updateSourceHint": "推荐中国大陆用户选择 CNB，非中国大陆用户选择 GitHub。",
+        "updateSources": {
+          "auto": "自动（优先 GitHub，失败回退 CNB）",
+          "github": "GitHub",
+          "cnb": "CNB"
+        }
       }
     },
     "errors": {

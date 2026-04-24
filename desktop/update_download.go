@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -72,6 +73,10 @@ func (h *desktopHost) startUpdateDownload(version string) (desktopUpdateState, e
 	if err != nil {
 		return desktopUpdateState{}, err
 	}
+	downloadCandidates := []string{info.Asset.DownloadURL}
+	if fallback := kiteversion.AlternateMirrorDownloadURL(info.Asset.DownloadURL); fallback != "" && fallback != info.Asset.DownloadURL {
+		downloadCandidates = append(downloadCandidates, fallback)
+	}
 
 	targetPath := filepath.Join(h.paths.TempDir, "updates", info.Asset.Name)
 	downloadState := desktopUpdateDownloadState{
@@ -97,7 +102,7 @@ func (h *desktopHost) startUpdateDownload(version string) (desktopUpdateState, e
 		return h.updateStore.load(), err
 	}
 
-	go h.runUpdateDownload(ctx, downloadID, downloadState)
+	go h.runUpdateDownload(ctx, downloadID, downloadState, downloadCandidates)
 	return h.updateStore.load(), nil
 }
 
@@ -156,7 +161,7 @@ func (h *desktopHost) resolveDownloadableUpdate(version string, state desktopUpd
 	return info, nil
 }
 
-func (h *desktopHost) runUpdateDownload(ctx context.Context, downloadID uint64, state desktopUpdateDownloadState) {
+func (h *desktopHost) runUpdateDownload(ctx context.Context, downloadID uint64, state desktopUpdateDownloadState, downloadCandidates []string) {
 	defer h.downloadManager.finish(downloadID)
 
 	if err := os.MkdirAll(filepath.Dir(state.TargetPath), 0o755); err != nil {
@@ -165,55 +170,86 @@ func (h *desktopHost) runUpdateDownload(ctx context.Context, downloadID uint64, 
 	}
 
 	tempPath := state.TargetPath + ".part"
+	var lastErr error
+	for _, candidateURL := range downloadCandidates {
+		if ctx.Err() != nil {
+			h.cleanupCanceledDownload(tempPath)
+			return
+		}
+		if strings.TrimSpace(candidateURL) == "" {
+			continue
+		}
+		state.DownloadURL = candidateURL
+		state.ReceivedBytes = 0
+		state.SpeedBytesPerSec = 0
+		state.UpdatedAt = time.Now().Format(time.RFC3339)
+		_ = h.updateStore.saveDownloadState(state)
+
+		if err := h.downloadUpdateAsset(ctx, &state, tempPath); err != nil {
+			if ctx.Err() != nil {
+				h.cleanupCanceledDownload(tempPath)
+				return
+			}
+			lastErr = err
+			_ = os.Remove(tempPath)
+			continue
+		}
+		lastErr = nil
+		break
+	}
+	if lastErr != nil {
+		h.failUpdateDownload(state, lastErr)
+		return
+	}
+
+	_ = h.updateStore.clearDownloadState()
+	_ = h.updateStore.saveReadyToApply(desktopUpdateReadyState{
+		Version:      state.Version,
+		AssetName:    state.AssetName,
+		Path:         state.TargetPath,
+		DownloadedAt: time.Now().Format(time.RFC3339),
+	})
+}
+
+func (h *desktopHost) downloadUpdateAsset(ctx context.Context, state *desktopUpdateDownloadState, tempPath string) error {
 	_ = os.Remove(tempPath)
 
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, state.DownloadURL, nil)
 	if err != nil {
-		h.failUpdateDownload(state, err)
-		return
+		return err
 	}
 	request.Header.Set("User-Agent", "kite-desktop-updater/"+kiteversion.Version)
 
 	response, err := http.DefaultClient.Do(request)
 	if err != nil {
-		if ctx.Err() != nil {
-			h.cleanupCanceledDownload(tempPath)
-			return
-		}
-		h.failUpdateDownload(state, err)
-		return
+		return err
 	}
 	defer func() {
 		_ = response.Body.Close()
 	}()
 
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		h.failUpdateDownload(state, fmt.Errorf("download failed with status %d", response.StatusCode))
-		return
+		return fmt.Errorf("download failed with status %d", response.StatusCode)
 	}
-
 	if response.ContentLength > 0 {
 		state.TotalBytes = response.ContentLength
 	}
 
 	file, err := os.Create(tempPath)
 	if err != nil {
-		h.failUpdateDownload(state, err)
-		return
+		return err
 	}
 
 	buffer := make([]byte, updateDownloadBufferSize)
-	startedAt := time.Now()
-	lastSampleTime := startedAt
+	lastSampleTime := time.Now()
 	lastSampleBytes := int64(0)
 
 	for {
 		n, readErr := response.Body.Read(buffer)
 		if n > 0 {
-			if _, err := file.Write(buffer[:n]); err != nil {
+			if _, writeErr := file.Write(buffer[:n]); writeErr != nil {
 				_ = file.Close()
-				h.failUpdateDownload(state, err)
-				return
+				return writeErr
 			}
 			state.ReceivedBytes += int64(n)
 
@@ -224,7 +260,7 @@ func (h *desktopHost) runUpdateDownload(ctx context.Context, downloadID uint64, 
 					state.SpeedBytesPerSec = int64(float64(state.ReceivedBytes-lastSampleBytes) / elapsed.Seconds())
 				}
 				state.UpdatedAt = now.Format(time.RFC3339)
-				_ = h.updateStore.saveDownloadState(state)
+				_ = h.updateStore.saveDownloadState(*state)
 				lastSampleTime = now
 				lastSampleBytes = state.ReceivedBytes
 			}
@@ -235,37 +271,16 @@ func (h *desktopHost) runUpdateDownload(ctx context.Context, downloadID uint64, 
 				break
 			}
 			_ = file.Close()
-			if ctx.Err() != nil {
-				h.cleanupCanceledDownload(tempPath)
-				return
-			}
-			h.failUpdateDownload(state, readErr)
-			return
+			return readErr
 		}
 	}
-
 	if err := file.Close(); err != nil {
-		h.failUpdateDownload(state, err)
-		return
+		return err
 	}
-
-	if ctx.Err() != nil {
-		h.cleanupCanceledDownload(tempPath)
-		return
-	}
-
 	if err := os.Rename(tempPath, state.TargetPath); err != nil {
-		h.failUpdateDownload(state, err)
-		return
+		return err
 	}
-
-	_ = h.updateStore.clearDownloadState()
-	_ = h.updateStore.saveReadyToApply(desktopUpdateReadyState{
-		Version:      state.Version,
-		AssetName:    state.AssetName,
-		Path:         state.TargetPath,
-		DownloadedAt: startedAt.Format(time.RFC3339),
-	})
+	return nil
 }
 
 func (h *desktopHost) failUpdateDownload(state desktopUpdateDownloadState, err error) {

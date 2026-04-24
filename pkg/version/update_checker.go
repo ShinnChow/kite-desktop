@@ -23,6 +23,12 @@ const (
 
 var githubLatestReleaseAPI = "https://api.github.com/repos/eryajf/kite-desktop/releases/latest"
 
+const (
+	UpdateSourceAuto   = "auto"
+	UpdateSourceGitHub = "github"
+	UpdateSourceCNB    = "cnb"
+)
+
 var (
 	updateInfoMu       sync.Mutex
 	cachedUpdateResult = updateCheckResult{}
@@ -73,7 +79,7 @@ type updateCheckResult struct {
 	checkedAt      time.Time
 }
 
-func checkForUpdate(ctx context.Context, currentVersion string, force bool) (updateCheckResult, error) {
+func checkForUpdate(ctx context.Context, currentVersion string, force bool, updateSource string) (updateCheckResult, error) {
 	sanitized := strings.TrimSpace(currentVersion)
 	if sanitized == "" || strings.EqualFold(sanitized, "dev") {
 		return updateCheckResult{
@@ -81,7 +87,8 @@ func checkForUpdate(ctx context.Context, currentVersion string, force bool) (upd
 			checkedAt:  time.Now(),
 		}, nil
 	}
-	cacheKey := buildUpdateCacheKey(sanitized)
+	source := ResolvePreferredUpdateSource(updateSource)
+	cacheKey := buildUpdateCacheKey(sanitized, source)
 
 	updateInfoMu.Lock()
 	if !force && time.Since(lastUpdateFetch) < versionCacheTTL && cachedUpdateKey == cacheKey {
@@ -156,6 +163,7 @@ func checkForUpdate(ctx context.Context, currentVersion string, force bool) (upd
 	default:
 		result.comparison = UpdateComparisonLocalNewer
 	}
+	applyUpdateSource(&result, source)
 
 	cacheUpdateResult(cacheKey, result)
 	return result, nil
@@ -183,8 +191,8 @@ func parseSemver(version string) (semver.Version, error) {
 	return parsed, nil
 }
 
-func buildUpdateCacheKey(version string) string {
-	return fmt.Sprintf("%s|%s|%s", normalizeVersionValue(version), runtime.GOOS, runtime.GOARCH)
+func buildUpdateCacheKey(version, source string) string {
+	return fmt.Sprintf("%s|%s|%s|%s", normalizeVersionValue(version), runtime.GOOS, runtime.GOARCH, ResolvePreferredUpdateSource(source))
 }
 
 func normalizeVersionValue(version string) string {
@@ -258,4 +266,85 @@ func containsAnyToken(value string, tokens []string) bool {
 	return slices.ContainsFunc(tokens, func(token string) bool {
 		return strings.Contains(value, token)
 	})
+}
+
+func NormalizeUpdateSource(source string) string {
+	switch strings.ToLower(strings.TrimSpace(source)) {
+	case UpdateSourceGitHub:
+		return UpdateSourceGitHub
+	case UpdateSourceCNB:
+		return UpdateSourceCNB
+	default:
+		return UpdateSourceAuto
+	}
+}
+
+func ResolvePreferredUpdateSource(source string) string {
+	normalized := NormalizeUpdateSource(source)
+	if normalized == UpdateSourceAuto {
+		return UpdateSourceGitHub
+	}
+	return normalized
+}
+
+func RewriteReleaseURLBySource(rawURL, source string) string {
+	switch ResolvePreferredUpdateSource(source) {
+	case UpdateSourceCNB:
+		return githubURLToCNB(rawURL)
+	case UpdateSourceGitHub:
+		return cnbURLToGitHub(rawURL)
+	default:
+		return rawURL
+	}
+}
+
+func RewriteAssetDownloadURLBySource(rawURL, source string) string {
+	return RewriteReleaseURLBySource(rawURL, source)
+}
+
+func AlternateMirrorDownloadURL(rawURL string) string {
+	if rewritten := githubURLToCNB(rawURL); rewritten != rawURL {
+		return rewritten
+	}
+	if rewritten := cnbURLToGitHub(rawURL); rewritten != rawURL {
+		return rewritten
+	}
+	return ""
+}
+
+func applyUpdateSource(result *updateCheckResult, source string) {
+	if result == nil {
+		return
+	}
+	result.releaseURL = RewriteReleaseURLBySource(result.releaseURL, source)
+	if result.asset == nil {
+		return
+	}
+	asset := *result.asset
+	asset.DownloadURL = RewriteAssetDownloadURLBySource(asset.DownloadURL, source)
+	result.asset = &asset
+}
+
+func githubURLToCNB(rawURL string) string {
+	const githubPrefix = "https://github.com/eryajf/kite-desktop/"
+	if !strings.HasPrefix(rawURL, githubPrefix) {
+		return rawURL
+	}
+	rest := strings.TrimPrefix(rawURL, githubPrefix)
+	if !strings.HasPrefix(rest, "releases/") {
+		return rawURL
+	}
+	return "https://cnb.cool/eryajf/kite-desktop/-/" + rest
+}
+
+func cnbURLToGitHub(rawURL string) string {
+	const cnbPrefix = "https://cnb.cool/eryajf/kite-desktop/-/"
+	if !strings.HasPrefix(rawURL, cnbPrefix) {
+		return rawURL
+	}
+	rest := strings.TrimPrefix(rawURL, cnbPrefix)
+	if !strings.HasPrefix(rest, "releases/") {
+		return rawURL
+	}
+	return "https://github.com/eryajf/kite-desktop/" + rest
 }

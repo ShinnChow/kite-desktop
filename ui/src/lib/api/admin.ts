@@ -398,6 +398,7 @@ export interface GeneralSetting {
   nodeTerminalImage: string
   enableAnalytics: boolean
   enableVersionCheck: boolean
+  updateSource: 'auto' | 'github' | 'cnb'
 }
 
 export interface GeneralSettingUpdateRequest {
@@ -414,6 +415,7 @@ export interface GeneralSettingUpdateRequest {
   nodeTerminalImage?: string
   enableAnalytics?: boolean
   enableVersionCheck?: boolean
+  updateSource?: 'auto' | 'github' | 'cnb'
 }
 
 export type CredentialProvider = 'password' | 'ldap'

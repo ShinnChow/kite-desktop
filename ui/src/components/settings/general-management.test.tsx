@@ -92,6 +92,7 @@ describe('GeneralManagement', () => {
         nodeTerminalImage: 'docker.cnb.cool/znb/images/busybox:latest',
         enableAnalytics: true,
         enableVersionCheck: true,
+        updateSource: 'auto',
       },
       isLoading: false,
     })
@@ -118,6 +119,7 @@ describe('GeneralManagement', () => {
       nodeTerminalImage: 'docker.cnb.cool/znb/images/busybox:latest',
       enableAnalytics: false,
       enableVersionCheck: true,
+      updateSource: 'auto',
     })
 
     renderComponent()
@@ -156,6 +158,7 @@ describe('GeneralManagement', () => {
       nodeTerminalImage: 'docker.cnb.cool/znb/images/busybox:latest',
       enableAnalytics: true,
       enableVersionCheck: true,
+      updateSource: 'auto',
     })
 
     renderComponent()

@@ -337,6 +337,16 @@ export function AboutManagement() {
     latestVersion &&
     !download &&
     !readyToApply
+  const githubReleaseURL = useMemo(() => {
+    const latest = updateResult?.latestVersion?.trim()
+    if (latest) {
+      return `${PROJECT_REPOSITORY_URL}/releases/tag/v${latest.replace(/^v/, '')}`
+    }
+    if (updateResult) {
+      return `${PROJECT_REPOSITORY_URL}/releases`
+    }
+    return ''
+  }, [updateResult])
 
   const commitURL = useMemo(() => {
     if (!commitId || commitId === '-' || commitId === 'unknown') {
@@ -417,11 +427,11 @@ export function AboutManagement() {
               <IconBrandGithub className="h-4 w-4" />
               {t('aboutManagement.actions.openGithub', 'GitHub Repository')}
             </Button>
-            {updateResult?.releaseUrl ? (
+            {githubReleaseURL ? (
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => void openURL(updateResult.releaseUrl)}
+                onClick={() => void openURL(githubReleaseURL)}
               >
                 <IconExternalLink className="h-4 w-4" />
                 {t('aboutManagement.actions.viewRelease', 'View release')}

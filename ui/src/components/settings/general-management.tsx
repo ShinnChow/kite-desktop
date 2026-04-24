@@ -44,6 +44,7 @@ interface GeneralSettingsFormData {
   nodeTerminalImage: string
   enableAnalytics: boolean
   enableVersionCheck: boolean
+  updateSource: 'auto' | 'github' | 'cnb'
 }
 
 export function shouldReloadForAnalyticsChange(
@@ -82,6 +83,7 @@ export function GeneralManagement() {
     nodeTerminalImage: DEFAULT_NODE_TERMINAL_IMAGE,
     enableAnalytics: true,
     enableVersionCheck: true,
+    updateSource: 'auto',
   })
 
   useEffect(() => {
@@ -101,6 +103,7 @@ export function GeneralManagement() {
       nodeTerminalImage: data.nodeTerminalImage || DEFAULT_NODE_TERMINAL_IMAGE,
       enableAnalytics: data.enableAnalytics ?? true,
       enableVersionCheck: data.enableVersionCheck ?? true,
+      updateSource: data.updateSource || 'auto',
     })
   }, [data])
 
@@ -190,6 +193,7 @@ export function GeneralManagement() {
         formData.nodeTerminalImage.trim() || DEFAULT_NODE_TERMINAL_IMAGE,
       enableAnalytics: formData.enableAnalytics,
       enableVersionCheck: formData.enableVersionCheck,
+      updateSource: formData.updateSource,
     }
     if (formData.aiApiKey.trim()) {
       payload.aiApiKey = formData.aiApiKey.trim()
@@ -562,6 +566,45 @@ export function GeneralManagement() {
                 }))
               }
             />
+          </div>
+
+          <div className="space-y-2 border-t p-3">
+            <Label htmlFor="general-update-source" className="text-sm">
+              {t(
+                'generalManagement.runtime.form.updateSource',
+                'Update download source'
+              )}
+            </Label>
+            <Select
+              value={formData.updateSource}
+              onValueChange={(value: 'auto' | 'github' | 'cnb') =>
+                setFormData((prev) => ({ ...prev, updateSource: value }))
+              }
+            >
+              <SelectTrigger id="general-update-source">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="auto">
+                  {t('generalManagement.runtime.form.updateSources.auto', 'Auto')}
+                </SelectItem>
+                <SelectItem value="github">
+                  {t(
+                    'generalManagement.runtime.form.updateSources.github',
+                    'GitHub'
+                  )}
+                </SelectItem>
+                <SelectItem value="cnb">
+                  {t('generalManagement.runtime.form.updateSources.cnb', 'CNB')}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs leading-5 text-muted-foreground">
+              {t(
+                'generalManagement.runtime.form.updateSourceHint',
+                'GitHub is recommended for users outside mainland China. CNB is recommended for users in mainland China.'
+              )}
+            </p>
           </div>
         </div>
 
