@@ -40,6 +40,11 @@ func main() {
 	if err != nil {
 		fatalf("apply update failed: %v", err)
 	}
+
+	// Best-effort cleanup after a successful apply to avoid leaving installer packages behind.
+	if err := os.Remove(*packagePath); err != nil && !os.IsNotExist(err) {
+		_, _ = fmt.Fprintf(os.Stderr, "cleanup update package failed: %v\n", err)
+	}
 }
 
 func fatalf(format string, args ...any) {

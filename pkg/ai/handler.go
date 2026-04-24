@@ -7,6 +7,7 @@ import (
 
 	"github.com/eryajf/kite-desktop/pkg/cluster"
 	"github.com/eryajf/kite-desktop/pkg/model"
+	kiteversion "github.com/eryajf/kite-desktop/pkg/version"
 	"github.com/gin-gonic/gin"
 )
 
@@ -210,6 +211,7 @@ func HandleGetGeneralSetting(c *gin.Context) {
 		"nodeTerminalImage":         setting.NodeTerminalImage,
 		"enableAnalytics":           setting.EnableAnalytics,
 		"enableVersionCheck":        setting.EnableVersionCheck,
+		"updateSource":              kiteversion.NormalizeUpdateSource(setting.UpdateSource),
 	})
 }
 
@@ -227,6 +229,7 @@ type UpdateGeneralSettingRequest struct {
 	NodeTerminalImage         string  `json:"nodeTerminalImage"`
 	EnableAnalytics           bool    `json:"enableAnalytics"`
 	EnableVersionCheck        bool    `json:"enableVersionCheck"`
+	UpdateSource              string  `json:"updateSource"`
 }
 
 func HandleUpdateGeneralSetting(c *gin.Context) {
@@ -291,6 +294,7 @@ func HandleUpdateGeneralSetting(c *gin.Context) {
 	}
 	aiChatHistorySessionLimit := model.NormalizeAIChatHistorySessionLimit(req.AIChatHistorySessionLimit)
 	aiChatOpenMode := model.NormalizeAIChatOpenMode(req.AIChatOpenMode)
+	updateSource := kiteversion.NormalizeUpdateSource(req.UpdateSource)
 
 	updates := map[string]interface{}{
 		"ai_agent_enabled":              req.AIAgentEnabled,
@@ -305,6 +309,7 @@ func HandleUpdateGeneralSetting(c *gin.Context) {
 		"node_terminal_image":           nodeTerminalImage,
 		"enable_analytics":              req.EnableAnalytics,
 		"enable_version_check":          req.EnableVersionCheck,
+		"update_source":                 updateSource,
 	}
 	if shouldUpdateAIAPIKey {
 		updates["ai_api_key"] = model.SecretString(aiAPIKey)
@@ -332,6 +337,7 @@ func HandleUpdateGeneralSetting(c *gin.Context) {
 		"nodeTerminalImage":         updated.NodeTerminalImage,
 		"enableAnalytics":           updated.EnableAnalytics,
 		"enableVersionCheck":        updated.EnableVersionCheck,
+		"updateSource":              kiteversion.NormalizeUpdateSource(updated.UpdateSource),
 	})
 }
 

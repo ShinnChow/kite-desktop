@@ -48,6 +48,7 @@ var (
 
 	DisableGZIP        = true
 	EnableVersionCheck = true
+	UpdateSource       = "auto"
 
 	// CORSAllowedOrigins is empty by default (no CORS in production).
 	// Developers can set CORS_ALLOWED_ORIGINS=http://localhost:5173 for
@@ -66,6 +67,7 @@ func LoadEnvs() {
 	CORSAllowedOrigins = nil
 	EnableAnalytics = true
 	EnableVersionCheck = true
+	UpdateSource = "auto"
 
 	if secret := os.Getenv("JWT_SECRET"); secret != "" {
 		JwtSecret = secret
@@ -128,6 +130,9 @@ func LoadEnvs() {
 
 	if v := os.Getenv("DISABLE_VERSION_CHECK"); v == "true" {
 		EnableVersionCheck = false
+	}
+	if v := strings.TrimSpace(os.Getenv("UPDATE_SOURCE")); v != "" {
+		UpdateSource = strings.ToLower(v)
 	}
 
 	if v := os.Getenv("KITE_BASE"); v != "" {

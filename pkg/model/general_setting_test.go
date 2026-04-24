@@ -127,14 +127,17 @@ func TestNormalizeAIChatOpenMode(t *testing.T) {
 func TestApplyRuntimeGeneralSetting(t *testing.T) {
 	originalAnalytics := common.EnableAnalytics
 	originalVersionCheck := common.EnableVersionCheck
+	originalUpdateSource := common.UpdateSource
 	t.Cleanup(func() {
 		common.EnableAnalytics = originalAnalytics
 		common.EnableVersionCheck = originalVersionCheck
+		common.UpdateSource = originalUpdateSource
 	})
 
 	applyRuntimeGeneralSetting(&GeneralSetting{
 		EnableAnalytics:    true,
 		EnableVersionCheck: false,
+		UpdateSource:       "cnb",
 	})
 
 	if !common.EnableAnalytics {
@@ -143,6 +146,9 @@ func TestApplyRuntimeGeneralSetting(t *testing.T) {
 	if common.EnableVersionCheck {
 		t.Fatalf("EnableVersionCheck = %v, want false", common.EnableVersionCheck)
 	}
+	if common.UpdateSource != "cnb" {
+		t.Fatalf("UpdateSource = %q, want %q", common.UpdateSource, "cnb")
+	}
 
 	applyRuntimeGeneralSetting(nil)
 	if !common.EnableAnalytics {
@@ -150,6 +156,9 @@ func TestApplyRuntimeGeneralSetting(t *testing.T) {
 	}
 	if common.EnableVersionCheck {
 		t.Fatalf("nil setting changed EnableVersionCheck")
+	}
+	if common.UpdateSource != "cnb" {
+		t.Fatalf("nil setting changed UpdateSource")
 	}
 }
 

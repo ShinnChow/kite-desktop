@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/eryajf/kite-desktop/pkg/common"
+	kiteversion "github.com/eryajf/kite-desktop/pkg/version"
 	"gorm.io/gorm"
 	"k8s.io/klog/v2"
 )
@@ -21,6 +22,7 @@ const DefaultAIChatOpenMode = AIChatOpenModeSidecar
 const GeneralAIProviderOpenAI = "openai"
 const GeneralAIProviderAnthropic = "anthropic"
 const DefaultGeneralAIProvider = GeneralAIProviderOpenAI
+const DefaultGeneralUpdateSource = kiteversion.UpdateSourceAuto
 
 const AIChatOpenModeOverlay = "overlay"
 const AIChatOpenModeSidecar = "sidecar"
@@ -48,6 +50,7 @@ type GeneralSetting struct {
 	NodeTerminalImage         string       `json:"nodeTerminalImage" gorm:"column:node_terminal_image;type:varchar(255);not null;default:'docker.cnb.cool/znb/images/busybox:latest'"`
 	EnableAnalytics           bool         `json:"enableAnalytics" gorm:"column:enable_analytics;type:boolean;not null;default:true"`
 	EnableVersionCheck        bool         `json:"enableVersionCheck" gorm:"column:enable_version_check;type:boolean;not null;default:true"`
+	UpdateSource              string       `json:"updateSource" gorm:"column:update_source;type:varchar(20);not null;default:'auto'"`
 	JWTSecret                 SecretString `json:"-" gorm:"column:jwt_secret;type:text"`
 	GlobalSidebarPreference   string       `json:"-" gorm:"column:global_sidebar_preference;type:text"`
 }
@@ -131,6 +134,11 @@ func GetGeneralSetting() (*GeneralSetting, error) {
 			setting.NodeTerminalImage = defaultNodeTerminalImage
 			updates["node_terminal_image"] = defaultNodeTerminalImage
 		}
+		normalizedUpdateSource := kiteversion.NormalizeUpdateSource(setting.UpdateSource)
+		if setting.UpdateSource != normalizedUpdateSource {
+			setting.UpdateSource = normalizedUpdateSource
+			updates["update_source"] = normalizedUpdateSource
+		}
 		if err := ensureJWTSecret(&setting, updates); err != nil {
 			return nil, err
 		}
@@ -159,6 +167,7 @@ func GetGeneralSetting() (*GeneralSetting, error) {
 		NodeTerminalImage:         DefaultGeneralNodeTerminalImageValue(),
 		EnableAnalytics:           common.EnableAnalytics,
 		EnableVersionCheck:        common.EnableVersionCheck,
+		UpdateSource:              kiteversion.NormalizeUpdateSource(common.UpdateSource),
 	}
 	if err := ensureJWTSecret(&setting, nil); err != nil {
 		return nil, err
@@ -191,6 +200,7 @@ func applyRuntimeGeneralSetting(setting *GeneralSetting) {
 	}
 	common.EnableAnalytics = setting.EnableAnalytics
 	common.EnableVersionCheck = setting.EnableVersionCheck
+	common.UpdateSource = kiteversion.NormalizeUpdateSource(setting.UpdateSource)
 }
 
 func ensureJWTSecret(setting *GeneralSetting, updates map[string]interface{}) error {

@@ -52,7 +52,7 @@ func GetVersion(c *gin.Context) {
 	}
 
 	if common.EnableVersionCheck {
-		r, err := checkForUpdate(c.Request.Context(), Version, false)
+		r, err := checkForUpdate(c.Request.Context(), Version, false, common.UpdateSource)
 		if err == nil {
 			versionInfo.HasNew = r.comparison == UpdateComparisonUpdateAvailable
 			if versionInfo.HasNew {
@@ -70,7 +70,7 @@ func CheckUpdate(c *gin.Context) {
 		return
 	}
 
-	result, err := checkForUpdate(c.Request.Context(), Version, req.Force)
+	result, err := checkForUpdate(c.Request.Context(), Version, req.Force, common.UpdateSource)
 	if err != nil {
 		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
 		return
@@ -86,8 +86,8 @@ func formatCheckedAt(checkedAt time.Time) string {
 	return checkedAt.Format(time.RFC3339)
 }
 
-func GetUpdateCheckInfo(ctx context.Context, currentVersion string, force bool) (UpdateCheckInfo, error) {
-	result, err := checkForUpdate(ctx, currentVersion, force)
+func GetUpdateCheckInfo(ctx context.Context, currentVersion string, force bool, updateSource string) (UpdateCheckInfo, error) {
+	result, err := checkForUpdate(ctx, currentVersion, force, updateSource)
 	if err != nil {
 		return UpdateCheckInfo{}, err
 	}

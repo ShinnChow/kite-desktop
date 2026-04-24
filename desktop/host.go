@@ -873,7 +873,7 @@ func (h *desktopHost) updateState() desktopUpdateState {
 }
 
 func (h *desktopHost) checkForUpdate(ctx context.Context, force bool) (kiteversion.UpdateCheckInfo, error) {
-	info, err := kiteversion.GetUpdateCheckInfo(ctx, kiteversion.Version, force)
+	info, err := kiteversion.GetUpdateCheckInfo(ctx, kiteversion.Version, force, common.UpdateSource)
 	if err != nil {
 		return kiteversion.UpdateCheckInfo{}, err
 	}

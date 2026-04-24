@@ -602,7 +602,14 @@
       "description": "Configure usage analytics and version checking. Analytics is enabled by default, and turning it off does not disable version checks.",
       "form": {
         "enableAnalytics": "Enable analytics",
-        "enableVersionCheck": "Enable version check"
+        "enableVersionCheck": "Enable version check",
+        "updateSource": "Update download source",
+        "updateSourceHint": "Users in mainland China are recommended to choose CNB, and users outside mainland China are recommended to choose GitHub.",
+        "updateSources": {
+          "auto": "Auto (GitHub first, fallback to CNB)",
+          "github": "GitHub",
+          "cnb": "CNB"
+        }
       }
     },
     "errors": {

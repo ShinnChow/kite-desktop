@@ -60,17 +60,20 @@ func TestGetVersionWithoutVersionCheck(t *testing.T) {
 	origBuildDate := BuildDate
 	origCommitID := CommitID
 	origEnableVersionCheck := common.EnableVersionCheck
+	origUpdateSource := common.UpdateSource
 	t.Cleanup(func() {
 		Version = origVersion
 		BuildDate = origBuildDate
 		CommitID = origCommitID
 		common.EnableVersionCheck = origEnableVersionCheck
+		common.UpdateSource = origUpdateSource
 	})
 
 	Version = "1.2.3"
 	BuildDate = "2026-03-27"
 	CommitID = "abc123"
 	common.EnableVersionCheck = false
+	common.UpdateSource = UpdateSourceAuto
 
 	recorder := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(recorder)
@@ -102,6 +105,7 @@ func TestGetVersionWithCachedUpdateResult(t *testing.T) {
 	origBuildDate := BuildDate
 	origCommitID := CommitID
 	origEnableVersionCheck := common.EnableVersionCheck
+	origUpdateSource := common.UpdateSource
 	origCachedUpdateResult := cachedUpdateResult
 	origCachedUpdateKey := cachedUpdateKey
 	origLastUpdateFetch := lastUpdateFetch
@@ -110,6 +114,7 @@ func TestGetVersionWithCachedUpdateResult(t *testing.T) {
 		BuildDate = origBuildDate
 		CommitID = origCommitID
 		common.EnableVersionCheck = origEnableVersionCheck
+		common.UpdateSource = origUpdateSource
 		cachedUpdateResult = origCachedUpdateResult
 		cachedUpdateKey = origCachedUpdateKey
 		lastUpdateFetch = origLastUpdateFetch
@@ -119,13 +124,14 @@ func TestGetVersionWithCachedUpdateResult(t *testing.T) {
 	BuildDate = "2026-03-27"
 	CommitID = "abc123"
 	common.EnableVersionCheck = true
+	common.UpdateSource = UpdateSourceAuto
 	cachedUpdateResult = updateCheckResult{
 		comparison:    UpdateComparisonUpdateAvailable,
 		latestVersion: "1.2.4",
 		releaseURL:    "https://example.com/releases/v1.2.4",
 		checkedAt:     time.Now(),
 	}
-	cachedUpdateKey = buildUpdateCacheKey(Version)
+	cachedUpdateKey = buildUpdateCacheKey(Version, UpdateSourceAuto)
 	lastUpdateFetch = time.Now()
 
 	recorder := httptest.NewRecorder()
@@ -164,10 +170,10 @@ func TestCheckForUpdateShortCircuitsWithoutNetwork(t *testing.T) {
 		releaseURL:    "https://example.com/releases/v1.2.4",
 		checkedAt:     time.Now(),
 	}
-	cachedUpdateKey = buildUpdateCacheKey("1.2.3")
+	cachedUpdateKey = buildUpdateCacheKey("1.2.3", UpdateSourceAuto)
 	lastUpdateFetch = time.Now()
 
-	got, err := checkForUpdate(context.Background(), "1.2.3", false)
+	got, err := checkForUpdate(context.Background(), "1.2.3", false, UpdateSourceAuto)
 	if err != nil {
 		t.Fatalf("checkForUpdate() error = %v", err)
 	}
@@ -177,7 +183,7 @@ func TestCheckForUpdateShortCircuitsWithoutNetwork(t *testing.T) {
 }
 
 func TestCheckForUpdateSkipsBlankAndDevVersions(t *testing.T) {
-	got, err := checkForUpdate(context.Background(), "   ", false)
+	got, err := checkForUpdate(context.Background(), "   ", false, UpdateSourceAuto)
 	if err != nil {
 		t.Fatalf("blank version returned error: %v", err)
 	}
@@ -185,7 +191,7 @@ func TestCheckForUpdateSkipsBlankAndDevVersions(t *testing.T) {
 		t.Fatalf("blank version comparison = %q, want %q", got.comparison, UpdateComparisonUncomparable)
 	}
 
-	got, err = checkForUpdate(context.Background(), "dev", false)
+	got, err = checkForUpdate(context.Background(), "dev", false, UpdateSourceAuto)
 	if err != nil {
 		t.Fatalf("dev version returned error: %v", err)
 	}
@@ -211,7 +217,7 @@ func TestCheckForUpdateComparisonStates(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			resetUpdateCheckerState(t)
 			versionCheckClient = stubVersionCheckClient(releasePayload(tt.remoteTag))
-			got, err := checkForUpdate(context.Background(), tt.currentVersion, true)
+			got, err := checkForUpdate(context.Background(), tt.currentVersion, true, UpdateSourceAuto)
 			if err != nil {
 				t.Fatalf("checkForUpdate() error = %v", err)
 			}
@@ -227,7 +233,7 @@ func TestCheckForUpdateFetchesLatestRelease(t *testing.T) {
 
 	versionCheckClient = stubVersionCheckClient(releasePayload("v1.2.4"))
 
-	got, err := checkForUpdate(context.Background(), "1.2.3", true)
+	got, err := checkForUpdate(context.Background(), "1.2.3", true, UpdateSourceAuto)
 	if err != nil {
 		t.Fatalf("checkForUpdate() error = %v", err)
 	}
@@ -284,12 +290,15 @@ func TestCheckUpdateReturnsLatestRelease(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	origVersion := Version
+	origUpdateSource := common.UpdateSource
 	t.Cleanup(func() {
 		Version = origVersion
+		common.UpdateSource = origUpdateSource
 	})
 
 	resetUpdateCheckerState(t)
 	Version = "v1.2.3"
+	common.UpdateSource = UpdateSourceAuto
 	versionCheckClient = stubVersionCheckClient(releasePayload("v1.2.4"))
 
 	recorder := httptest.NewRecorder()
@@ -329,6 +338,30 @@ func TestCheckUpdateReturnsLatestRelease(t *testing.T) {
 
 	if runtime.GOOS == "darwin" && runtime.GOARCH == "arm64" && (!got.AssetAvailable || got.Asset == nil) {
 		t.Fatalf("expected darwin arm64 asset to be available: %#v", got)
+	}
+}
+
+func TestUpdateSourceRewrite(t *testing.T) {
+	releaseURL := "https://github.com/eryajf/kite-desktop/releases/tag/v0.1.10"
+	downloadURL := "https://github.com/eryajf/kite-desktop/releases/download/v0.1.10/Kite-v0.1.10-macos-apple-silicon.dmg"
+
+	if got := RewriteReleaseURLBySource(releaseURL, UpdateSourceCNB); got != "https://cnb.cool/eryajf/kite-desktop/-/releases/tag/v0.1.10" {
+		t.Fatalf("RewriteReleaseURLBySource(cnb) = %q", got)
+	}
+	if got := RewriteAssetDownloadURLBySource(downloadURL, UpdateSourceCNB); got != "https://cnb.cool/eryajf/kite-desktop/-/releases/download/v0.1.10/Kite-v0.1.10-macos-apple-silicon.dmg" {
+		t.Fatalf("RewriteAssetDownloadURLBySource(cnb) = %q", got)
+	}
+}
+
+func TestAlternateMirrorDownloadURL(t *testing.T) {
+	githubURL := "https://github.com/eryajf/kite-desktop/releases/download/v0.1.10/Kite-v0.1.10-macos-apple-silicon.dmg"
+	cnbURL := "https://cnb.cool/eryajf/kite-desktop/-/releases/download/v0.1.10/Kite-v0.1.10-macos-apple-silicon.dmg"
+
+	if got := AlternateMirrorDownloadURL(githubURL); got != cnbURL {
+		t.Fatalf("AlternateMirrorDownloadURL(github) = %q, want %q", got, cnbURL)
+	}
+	if got := AlternateMirrorDownloadURL(cnbURL); got != githubURL {
+		t.Fatalf("AlternateMirrorDownloadURL(cnb) = %q, want %q", got, githubURL)
 	}
 }
 
