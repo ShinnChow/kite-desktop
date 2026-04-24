@@ -164,6 +164,15 @@ func TestNormalizeAndDenormalizeWindowBounds(t *testing.T) {
 
 func TestBuildApplicationMenuIncludesEditMenu(t *testing.T) {
 	menu := buildApplicationMenu(nil, false)
+	if menu.FindByLabel("About Kite") == nil {
+		t.Fatal("expected application menu to include About Kite entry")
+	}
+	if menu.FindByLabel("Preferences") == nil {
+		t.Fatal("expected application menu to include Preferences entry")
+	}
+	if preferences := menu.FindByLabel("Preferences"); preferences.GetAccelerator() != "Cmd+," {
+		t.Fatalf("expected Preferences accelerator to be Cmd+,, got %q", preferences.GetAccelerator())
+	}
 	if menu.FindByLabel("Edit") == nil {
 		t.Fatal("expected application menu to include an Edit submenu")
 	}
@@ -190,8 +199,33 @@ func TestBuildApplicationMenuIncludesEditMenu(t *testing.T) {
 	if menu.FindByRole(application.Copy) == nil {
 		t.Fatal("expected application menu to include standard clipboard shortcuts")
 	}
+	if runtime.GOOS == "darwin" {
+		closeWindow := menu.FindByLabel("Close Window")
+		if closeWindow == nil {
+			t.Fatal("expected application menu to include Close Window entry on macOS")
+		}
+		if closeWindow.GetAccelerator() != "Cmd+W" {
+			t.Fatalf("expected Close Window accelerator to be Cmd+W, got %q", closeWindow.GetAccelerator())
+		}
+	}
 	if runtime.GOOS == "windows" && menu.FindByRole(application.Paste) != nil {
 		t.Fatal("expected Windows menu to leave Paste shortcut to WebView2")
+	}
+}
+
+func TestBuildTrayMenuIncludesDesktopNavigationEntries(t *testing.T) {
+	menu := buildTrayMenu(nil)
+	if menu.FindByLabel("Show Kite") == nil {
+		t.Fatal("expected tray menu to include Show Kite entry")
+	}
+	if menu.FindByLabel("Settings") == nil {
+		t.Fatal("expected tray menu to include Settings entry")
+	}
+	if menu.FindByLabel("Desktop Settings") == nil {
+		t.Fatal("expected tray menu to include Desktop Settings entry")
+	}
+	if menu.FindByLabel("About Kite") == nil {
+		t.Fatal("expected tray menu to include About Kite entry")
 	}
 }
 
