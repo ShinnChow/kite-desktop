@@ -79,25 +79,27 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
   const branding = (
     <SidebarHeader className="gap-2 border-b border-sidebar-border/60 px-2 py-2">
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1.5">
         <Link
           to="/"
           onClick={handleMenuItemClick}
-          className="flex min-w-0 items-center gap-2 overflow-hidden"
+          className="flex shrink-0 items-center gap-2"
         >
           <img src={Icon} alt="Kite Logo" className="h-8 w-8 shrink-0" />
-          <span className="bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-base font-semibold text-transparent">
+          <span className="shrink-0 bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-base font-semibold text-transparent">
             Kite
           </span>
         </Link>
-        <NavigationControls />
+        <div className="shrink-0">
+          <NavigationControls />
+        </div>
         {showUpdateBadge ? (
           <Link
             to="/settings?tab=about"
             onClick={handleMenuItemClick}
             aria-label={t('sidebar.newVersionAvailable', 'New version available')}
             title={t('sidebar.newVersionAvailable', 'New version available')}
-            className="italic text-[10px] font-semibold text-red-500 transition-colors hover:text-red-600"
+            className="shrink-0 italic text-[10px] font-semibold text-red-500 transition-colors hover:text-red-600"
           >
             new
           </Link>
