@@ -61,6 +61,7 @@ import { Toggle } from '@/components/ui/toggle'
 
 import { ErrorMessage } from './error-message'
 import { ResourceTableView } from './resource-table-view'
+import { RowContextMenuItem } from './row-context-menu'
 import { NamespaceSelector } from './selector/namespace-selector'
 
 export interface ResourceTableProps<T> {
@@ -75,6 +76,7 @@ export interface ResourceTableProps<T> {
   extraToolbars?: React.ReactNode[] // Additional toolbar components
   defaultHiddenColumns?: string[] // Columns to hide by default
   batchDeleteConfirmationValue?: string
+  getRowContextMenuItems?: (item: T) => RowContextMenuItem<T>[]
 }
 
 export function ResourceTable<T>({
@@ -88,6 +90,7 @@ export function ResourceTable<T>({
   extraToolbars = [],
   defaultHiddenColumns = [],
   batchDeleteConfirmationValue,
+  getRowContextMenuItems,
 }: ResourceTableProps<T>) {
   const { t } = useTranslation()
   const [sorting, setSorting] = useState<SortingState>([])
@@ -581,8 +584,7 @@ export function ResourceTable<T>({
 
   const emptyState = renderEmptyState()
   const batchDeleteConfirmationTarget =
-    batchDeleteConfirmationValue ??
-    t('deleteConfirmation.confirmDeleteKeyword')
+    batchDeleteConfirmationValue ?? t('deleteConfirmation.confirmDeleteKeyword')
   const batchDeleteConfirmDisabled =
     isDeleting || deleteConfirmationInput !== batchDeleteConfirmationTarget
 
@@ -658,9 +660,10 @@ export function ResourceTable<T>({
               }
               const uniqueValues = column.getFacetedUniqueValues()
               const rawFilterValue = column.getFilterValue()
-              const filterValue = Array.isArray(rawFilterValue) && rawFilterValue.length === 1
-                ? (rawFilterValue[0] as string)
-                : ''
+              const filterValue =
+                Array.isArray(rawFilterValue) && rawFilterValue.length === 1
+                  ? (rawFilterValue[0] as string)
+                  : ''
 
               return (
                 <Select
@@ -809,6 +812,7 @@ export function ResourceTable<T>({
         searchQuery={searchQuery}
         pagination={pagination}
         setPagination={setPagination}
+        getRowContextMenuItems={getRowContextMenuItems}
       />
 
       {/* Delete Confirmation Dialog */}

@@ -1,10 +1,13 @@
 import { useCallback, useMemo } from 'react'
 import { createColumnHelper } from '@tanstack/react-table'
 import { Pod } from 'kubernetes-types/core/v1'
+import { Copy, Eye } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
+import { toast } from 'sonner'
 
 import { PodWithMetrics } from '@/types/api'
+import { copyTextToClipboard } from '@/lib/desktop'
 import { getPodStatus } from '@/lib/k8s'
 import { formatDate, getAge } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
@@ -16,9 +19,11 @@ import {
 import { MetricCell } from '@/components/metrics-cell'
 import { PodStatusIcon } from '@/components/pod-status-icon'
 import { ResourceTable } from '@/components/resource-table'
+import { RowContextMenuItem } from '@/components/row-context-menu'
 
 export function PodListPage() {
   const { t } = useTranslation()
+  const navigate = useNavigate()
   // Define column helper outside of any hooks
   const columnHelper = createColumnHelper<PodWithMetrics>()
 
@@ -149,6 +154,54 @@ export function PodListPage() {
     )
   }, [])
 
+  const getPodDetailPath = useCallback((pod: Pod) => {
+    return `/pods/${pod.metadata!.namespace}/${pod.metadata!.name}`
+  }, [])
+
+  const handleCopy = useCallback(
+    async (value: string) => {
+      await copyTextToClipboard(value)
+      toast.success(t('keyValueDataViewer.copiedToClipboard'))
+    },
+    [t]
+  )
+
+  const getRowContextMenuItems = useCallback(
+    (pod: Pod): RowContextMenuItem<Pod>[] => {
+      const podIP = pod.status?.podIP
+
+      return [
+        {
+          key: 'open-details',
+          label: t('common.viewDetails', 'View details'),
+          icon: <Eye className="h-4 w-4" />,
+          onSelect: () => navigate(getPodDetailPath(pod)),
+        },
+        { type: 'separator', key: 'primary-actions-separator' },
+        {
+          key: 'copy-name',
+          label: t('common.copyName', 'Copy name'),
+          icon: <Copy className="h-4 w-4" />,
+          onSelect: () => handleCopy(pod.metadata?.name || ''),
+        },
+        {
+          key: 'copy-namespace',
+          label: t('common.copyNamespace', 'Copy namespace'),
+          icon: <Copy className="h-4 w-4" />,
+          onSelect: () => handleCopy(pod.metadata?.namespace || ''),
+        },
+        {
+          key: 'copy-pod-ip',
+          label: t('pods.copyPodIP', 'Copy Pod IP'),
+          icon: <Copy className="h-4 w-4" />,
+          disabled: !podIP,
+          onSelect: () => handleCopy(podIP || ''),
+        },
+      ]
+    },
+    [getPodDetailPath, handleCopy, navigate, t]
+  )
+
   return (
     <ResourceTable<Pod>
       resourceName="Pods"
@@ -158,6 +211,7 @@ export function PodListPage() {
       batchDeleteConfirmationValue={t(
         'deleteConfirmation.confirmDeleteKeyword'
       )}
+      getRowContextMenuItems={getRowContextMenuItems}
     />
   )
 }

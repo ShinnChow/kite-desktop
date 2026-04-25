@@ -1,16 +1,21 @@
 import { useCallback, useMemo } from 'react'
 import { createColumnHelper } from '@tanstack/react-table'
 import { Service } from 'kubernetes-types/core/v1'
+import { Copy, Eye } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
+import { toast } from 'sonner'
 
+import { copyTextToClipboard } from '@/lib/desktop'
 import { getServiceExternalIP } from '@/lib/k8s'
 import { formatDate } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { ResourceTable } from '@/components/resource-table'
+import { RowContextMenuItem } from '@/components/row-context-menu'
 
 export function ServiceListPage() {
   const { t } = useTranslation()
+  const navigate = useNavigate()
   // Define column helper outside of any hooks
   const columnHelper = createColumnHelper<Service>()
 
@@ -105,6 +110,54 @@ export function ServiceListPage() {
     )
   }, [])
 
+  const getServiceDetailPath = useCallback((service: Service) => {
+    return `/services/${service.metadata!.namespace}/${service.metadata!.name}`
+  }, [])
+
+  const handleCopy = useCallback(
+    async (value: string) => {
+      await copyTextToClipboard(value)
+      toast.success(t('keyValueDataViewer.copiedToClipboard'))
+    },
+    [t]
+  )
+
+  const getRowContextMenuItems = useCallback(
+    (service: Service): RowContextMenuItem<Service>[] => {
+      const clusterIP = service.spec?.clusterIP
+
+      return [
+        {
+          key: 'open-details',
+          label: t('common.viewDetails', 'View details'),
+          icon: <Eye className="h-4 w-4" />,
+          onSelect: () => navigate(getServiceDetailPath(service)),
+        },
+        { type: 'separator', key: 'primary-actions-separator' },
+        {
+          key: 'copy-name',
+          label: t('common.copyName', 'Copy name'),
+          icon: <Copy className="h-4 w-4" />,
+          onSelect: () => handleCopy(service.metadata?.name || ''),
+        },
+        {
+          key: 'copy-namespace',
+          label: t('common.copyNamespace', 'Copy namespace'),
+          icon: <Copy className="h-4 w-4" />,
+          onSelect: () => handleCopy(service.metadata?.namespace || ''),
+        },
+        {
+          key: 'copy-cluster-ip',
+          label: t('services.copyClusterIP', 'Copy ClusterIP'),
+          icon: <Copy className="h-4 w-4" />,
+          disabled: !clusterIP || clusterIP === 'None',
+          onSelect: () => handleCopy(clusterIP || ''),
+        },
+      ]
+    },
+    [getServiceDetailPath, handleCopy, navigate, t]
+  )
+
   return (
     <ResourceTable
       resourceName="Services"
@@ -114,6 +167,7 @@ export function ServiceListPage() {
       batchDeleteConfirmationValue={t(
         'deleteConfirmation.confirmDeleteKeyword'
       )}
+      getRowContextMenuItems={getRowContextMenuItems}
     />
   )
 }

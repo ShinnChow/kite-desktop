@@ -7,7 +7,12 @@ import {
 } from '@tanstack/react-table'
 import { useTranslation } from 'react-i18next'
 
+import {
+  RowContextMenuContentRenderer,
+  RowContextMenuItem,
+} from './row-context-menu'
 import { Button } from './ui/button'
+import { ContextMenu, ContextMenuTrigger } from './ui/context-menu'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -84,6 +89,20 @@ export function ActionTable<T>({
     getCoreRowModel: getCoreRowModel(),
   })
 
+  const getRowContextMenuItems = useMemo(() => {
+    if (actions.length === 0) {
+      return undefined
+    }
+
+    return (item: T): RowContextMenuItem<T>[] =>
+      actions.map((action, index) => ({
+        key: `action-${index}`,
+        label: action.dynamicLabel ? action.dynamicLabel(item) : action.label,
+        disabled: action.shouldDisable?.(item) ?? false,
+        onSelect: action.onClick,
+      }))
+  }, [actions])
+
   return (
     <div className="rounded-md border">
       <Table>
@@ -104,20 +123,42 @@ export function ActionTable<T>({
           ))}
         </TableHeader>
         <TableBody>
-          {table.getRowModel().rows.map((row) => (
-            <TableRow
-              key={row.id}
-              data-state={row.getIsSelected() && 'selected'}
-            >
-              {row.getVisibleCells().map((cell) => (
-                <TableCell key={cell.id}>
-                  {cell.column.columnDef.cell
-                    ? flexRender(cell.column.columnDef.cell, cell.getContext())
-                    : String(cell.getValue() || '-')}
-                </TableCell>
-              ))}
-            </TableRow>
-          ))}
+          {table.getRowModel().rows.map((row) => {
+            const contextMenuItems =
+              getRowContextMenuItems?.(row.original) ?? []
+
+            const rowContent = (
+              <TableRow
+                key={row.id}
+                data-state={row.getIsSelected() && 'selected'}
+              >
+                {row.getVisibleCells().map((cell) => (
+                  <TableCell key={cell.id}>
+                    {cell.column.columnDef.cell
+                      ? flexRender(
+                          cell.column.columnDef.cell,
+                          cell.getContext()
+                        )
+                      : String(cell.getValue() || '-')}
+                  </TableCell>
+                ))}
+              </TableRow>
+            )
+
+            if (contextMenuItems.length === 0) {
+              return rowContent
+            }
+
+            return (
+              <ContextMenu key={row.id}>
+                <ContextMenuTrigger asChild>{rowContent}</ContextMenuTrigger>
+                <RowContextMenuContentRenderer
+                  item={row.original}
+                  items={contextMenuItems}
+                />
+              </ContextMenu>
+            )
+          })}
         </TableBody>
       </Table>
     </div>

@@ -8,8 +8,8 @@ import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { cn } from '@/lib/utils'
-import { ColumnFilterPopover } from '@/components/column-filter-popover'
 import { Button } from '@/components/ui/button'
+import { ContextMenu, ContextMenuTrigger } from '@/components/ui/context-menu'
 import {
   Select,
   SelectContent,
@@ -25,6 +25,11 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { ColumnFilterPopover } from '@/components/column-filter-popover'
+import {
+  RowContextMenuContentRenderer,
+  RowContextMenuItem,
+} from '@/components/row-context-menu'
 
 interface ResourceTableViewProps<T> {
   table: TableInstance<T>
@@ -42,6 +47,7 @@ interface ResourceTableViewProps<T> {
   searchQuery: string
   pagination: PaginationState
   setPagination: React.Dispatch<React.SetStateAction<PaginationState>>
+  getRowContextMenuItems?: (item: T) => RowContextMenuItem<T>[]
 }
 
 export function ResourceTableView<T>({
@@ -60,6 +66,7 @@ export function ResourceTableView<T>({
   searchQuery,
   pagination,
   setPagination,
+  getRowContextMenuItems,
 }: ResourceTableViewProps<T>) {
   const { t } = useTranslation()
   const renderRows = () => {
@@ -75,20 +82,38 @@ export function ResourceTableView<T>({
       )
     }
 
-    return rows.map((row) => (
-      <TableRow key={row.id} data-state={row.getIsSelected() && 'selected'}>
-        {row.getVisibleCells().map((cell, index) => (
-          <TableCell
-            key={cell.id}
-            className={`align-middle ${index <= 1 ? 'text-left' : 'text-center'}`}
-          >
-            {cell.column.columnDef.cell
-              ? flexRender(cell.column.columnDef.cell, cell.getContext())
-              : String(cell.getValue() || '-')}
-          </TableCell>
-        ))}
-      </TableRow>
-    ))
+    return rows.map((row) => {
+      const contextMenuItems = getRowContextMenuItems?.(row.original) ?? []
+
+      const rowContent = (
+        <TableRow key={row.id} data-state={row.getIsSelected() && 'selected'}>
+          {row.getVisibleCells().map((cell, index) => (
+            <TableCell
+              key={cell.id}
+              className={`align-middle ${index <= 1 ? 'text-left' : 'text-center'}`}
+            >
+              {cell.column.columnDef.cell
+                ? flexRender(cell.column.columnDef.cell, cell.getContext())
+                : String(cell.getValue() || '-')}
+            </TableCell>
+          ))}
+        </TableRow>
+      )
+
+      if (contextMenuItems.length === 0) {
+        return rowContent
+      }
+
+      return (
+        <ContextMenu key={row.id}>
+          <ContextMenuTrigger asChild>{rowContent}</ContextMenuTrigger>
+          <RowContextMenuContentRenderer
+            item={row.original}
+            items={contextMenuItems}
+          />
+        </ContextMenu>
+      )
+    })
   }
 
   const dataLength = data?.length ?? 0

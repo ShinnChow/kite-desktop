@@ -13,6 +13,7 @@ import { Node } from 'kubernetes-types/core/v1'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
+import { trackResourceAction } from '@/lib/analytics'
 import {
   cordonNode,
   drainNode,
@@ -23,7 +24,6 @@ import {
   useResource,
   useResources,
 } from '@/lib/api'
-import { trackResourceAction } from '@/lib/analytics'
 import {
   enrichNodeConditionsWithHealth,
   formatCPU,
@@ -49,13 +49,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { RefreshButton } from '@/components/refresh-button'
 import { DescribeDialog } from '@/components/describe-dialog'
 import { ErrorMessage } from '@/components/error-message'
 import { EventTable } from '@/components/event-table'
 import { LabelsAnno } from '@/components/lables-anno'
 import { NodeMonitoring } from '@/components/node-monitoring'
 import { PodTable } from '@/components/pod-table'
+import { RefreshButton } from '@/components/refresh-button'
 import { Terminal } from '@/components/terminal'
 import { YamlEditor } from '@/components/yaml-editor'
 
@@ -140,7 +140,11 @@ export function NodeDetail(props: { name: string }) {
         delete_local_data: drainOptions.deleteLocalData,
         ignore_daemonsets: drainOptions.ignoreDaemonsets,
       })
-      toast.success(`Node ${name} drained successfully`)
+      toast.success(
+        t('detail.status.nodeDrainInitiated', {
+          name,
+        })
+      )
       setIsDrainPopoverOpen(false)
       handleRefresh()
     } catch (error) {
@@ -287,7 +291,11 @@ export function NodeDetail(props: { name: string }) {
           <h1 className="text-lg font-bold">{name}</h1>
         </div>
         <div className="flex w-full flex-wrap gap-2 md:w-auto md:justify-end">
-          <RefreshButton variant="outline" size="sm" onClick={handleManualRefresh}>
+          <RefreshButton
+            variant="outline"
+            size="sm"
+            onClick={handleManualRefresh}
+          >
             {t('detail.buttons.refresh')}
           </RefreshButton>
           <DescribeDialog resourceType="nodes" name={name} />
@@ -488,7 +496,9 @@ export function NodeDetail(props: { name: string }) {
                       onChange={(e) =>
                         setTaintData({ ...taintData, value: e.target.value })
                       }
-                      placeholder={t('detail.dialogs.taintNode.valuePlaceholder')}
+                      placeholder={t(
+                        'detail.dialogs.taintNode.valuePlaceholder'
+                      )}
                     />
                   </div>
                   <div className="space-y-2">
@@ -613,7 +623,9 @@ export function NodeDetail(props: { name: string }) {
                 {/* Node Information */}
                 <Card>
                   <CardHeader>
-                    <CardTitle>{t('detail.sections.nodeInformation')}</CardTitle>
+                    <CardTitle>
+                      {t('detail.sections.nodeInformation')}
+                    </CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -662,7 +674,8 @@ export function NodeDetail(props: { name: string }) {
                           {t('detail.fields.osImage')}
                         </Label>
                         <p className="text-sm">
-                          {data.status?.nodeInfo?.osImage || t('detail.fields.na')}
+                          {data.status?.nodeInfo?.osImage ||
+                            t('detail.fields.na')}
                         </p>
                       </div>
                       <div>
@@ -712,7 +725,9 @@ export function NodeDetail(props: { name: string }) {
                 {/* Resource Capacity & Allocation */}
                 <Card>
                   <CardHeader>
-                    <CardTitle>{t('detail.sections.resourceCapacity')}</CardTitle>
+                    <CardTitle>
+                      {t('detail.sections.resourceCapacity')}
+                    </CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -770,7 +785,8 @@ export function NodeDetail(props: { name: string }) {
 
                       <div>
                         <h4 className="text-sm font-medium mb-3">
-                          {t('detail.fields.pods')} & {t('detail.fields.storage')}
+                          {t('detail.fields.pods')} &{' '}
+                          {t('detail.fields.storage')}
                         </h4>
                         <div className="space-y-3">
                           <div className="flex justify-between items-center p-3 border rounded-lg">
