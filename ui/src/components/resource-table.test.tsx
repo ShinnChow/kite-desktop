@@ -102,4 +102,37 @@ describe('ResourceTable batch delete confirmation', () => {
       )
     })
   })
+
+  it('opens a row context menu and triggers the selected action', async () => {
+    const onInspect = vi.fn()
+    const columnHelper = createColumnHelper<Deployment>()
+
+    render(
+      <ResourceTable
+        resourceName="Deployments"
+        resourceType="deployments"
+        clusterScope={true}
+        columns={[
+          columnHelper.accessor('metadata.name', {
+            header: 'Name',
+            cell: ({ row }) => row.original.metadata?.name,
+          }),
+        ]}
+        getRowContextMenuItems={(item) => [
+          {
+            key: 'inspect',
+            label: 'Inspect resource',
+            onSelect: () => onInspect(item.metadata?.name),
+          },
+        ]}
+      />
+    )
+
+    fireEvent.contextMenu(screen.getByText('demo'))
+
+    const menuItem = await screen.findByText('Inspect resource')
+    fireEvent.click(menuItem)
+
+    expect(onInspect).toHaveBeenCalledWith('demo')
+  })
 })

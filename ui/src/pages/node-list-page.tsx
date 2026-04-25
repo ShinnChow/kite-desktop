@@ -1,14 +1,41 @@
-import { useCallback, useMemo } from 'react'
+import { useCallback, useMemo, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { createColumnHelper } from '@tanstack/react-table'
+import type { TFunction } from 'i18next'
+import {
+  Ban,
+  Copy,
+  Droplets,
+  FileCode2,
+  RotateCcw,
+  TerminalSquare,
+} from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
+import { toast } from 'sonner'
 
 import { NodeWithMetrics } from '@/types/api'
-import { formatDate } from '@/lib/utils'
+import { trackResourceAction } from '@/lib/analytics'
+import { cordonNode, drainNode, uncordonNode } from '@/lib/api'
+import { copyTextToClipboard } from '@/lib/desktop'
+import { formatDate, translateError } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { MetricCell } from '@/components/metrics-cell'
 import { NodeStatusIcon } from '@/components/node-status-icon'
 import { ResourceTable } from '@/components/resource-table'
+import { RowContextMenuItem } from '@/components/row-context-menu'
+import { Terminal } from '@/components/terminal'
 
 function getNodeStatus(node: NodeWithMetrics): string {
   const conditions = node.status?.conditions || []
@@ -53,6 +80,29 @@ function getNodeStatus(node: NodeWithMetrics): string {
   }
 
   return 'NotReady'
+}
+
+function getNodeStatusLabel(t: TFunction, status: string): string {
+  switch (status) {
+    case 'Ready':
+      return t('detail.fields.ready', 'Ready')
+    case 'NotReady':
+      return t('detail.fields.notReady', 'Not Ready')
+    case 'Ready,SchedulingDisabled':
+      return `${t('detail.fields.ready', 'Ready')}${t('detail.fields.schedulingDisabled', ' (SchedulingDisabled)')}`
+    case 'NotReady,SchedulingDisabled':
+      return `${t('detail.fields.notReady', 'Not Ready')}${t('detail.fields.schedulingDisabled', ' (SchedulingDisabled)')}`
+    case 'NetworkUnavailable':
+      return t('nodes.status.networkUnavailable', 'Network unavailable')
+    case 'MemoryPressure':
+      return t('nodes.status.memoryPressure', 'Memory pressure')
+    case 'DiskPressure':
+      return t('nodes.status.diskPressure', 'Disk pressure')
+    case 'PIDPressure':
+      return t('nodes.status.pidPressure', 'PID pressure')
+    default:
+      return status
+  }
 }
 
 function getNodeRoles(node: NodeWithMetrics): string[] {
@@ -114,6 +164,33 @@ function getNodeIP(node: NodeWithMetrics): string {
 
 export function NodeListPage() {
   const { t } = useTranslation()
+  const navigate = useNavigate()
+  const queryClient = useQueryClient()
+  const [terminalNode, setTerminalNode] = useState<NodeWithMetrics | null>(null)
+  const [cordonNodeTarget, setCordonNodeTarget] =
+    useState<NodeWithMetrics | null>(null)
+  const [drainNodeTarget, setDrainNodeTarget] =
+    useState<NodeWithMetrics | null>(null)
+  const [uncordonNodeTarget, setUncordonNodeTarget] =
+    useState<NodeWithMetrics | null>(null)
+  const [isCordonSubmitting, setIsCordonSubmitting] = useState(false)
+  const [isDrainSubmitting, setIsDrainSubmitting] = useState(false)
+  const [isUncordonSubmitting, setIsUncordonSubmitting] = useState(false)
+  const [drainOptions, setDrainOptions] = useState({
+    force: false,
+    gracePeriod: 30,
+    deleteLocalData: false,
+    ignoreDaemonsets: true,
+  })
+
+  const resetDrainOptions = useCallback(() => {
+    setDrainOptions({
+      force: false,
+      gracePeriod: 30,
+      deleteLocalData: false,
+      ignoreDaemonsets: true,
+    })
+  }, [])
 
   // Define column helper outside of any hooks
   const columnHelper = createColumnHelper<NodeWithMetrics>()
@@ -139,7 +216,7 @@ export function NodeListPage() {
           return (
             <Badge variant="outline" className="text-muted-foreground px-1.5">
               <NodeStatusIcon status={status} />
-              {status}
+              {getNodeStatusLabel(t, status)}
             </Badge>
           )
         },
@@ -278,18 +355,424 @@ export function NodeListPage() {
     []
   )
 
+  const handleCopy = useCallback(
+    async (value: string) => {
+      await copyTextToClipboard(value)
+      toast.success(t('keyValueDataViewer.copiedToClipboard'))
+    },
+    [t]
+  )
+
+  const refreshNodeList = useCallback(async () => {
+    await queryClient.invalidateQueries({ queryKey: ['nodes'] })
+  }, [queryClient])
+
+  const handleOpenNodeTerminal = useCallback((node: NodeWithMetrics) => {
+    setTerminalNode(node)
+  }, [])
+
+  const handleCordon = useCallback(async () => {
+    if (!cordonNodeTarget?.metadata?.name) {
+      return
+    }
+
+    setIsCordonSubmitting(true)
+    try {
+      await cordonNode(cordonNodeTarget.metadata.name)
+      trackResourceAction('nodes', 'cordon', {
+        result: 'success',
+      })
+      toast.success(
+        t('detail.status.nodeCordoned', {
+          name: cordonNodeTarget.metadata.name,
+        })
+      )
+      setCordonNodeTarget(null)
+      await refreshNodeList()
+    } catch (error) {
+      console.error('Failed to cordon node:', error)
+      trackResourceAction('nodes', 'cordon', {
+        result: 'error',
+      })
+      toast.error(translateError(error, t))
+    } finally {
+      setIsCordonSubmitting(false)
+    }
+  }, [cordonNodeTarget, refreshNodeList, t])
+
+  const handleDrain = useCallback(async () => {
+    if (!drainNodeTarget?.metadata?.name) {
+      return
+    }
+
+    setIsDrainSubmitting(true)
+    try {
+      await drainNode(drainNodeTarget.metadata.name, drainOptions)
+      trackResourceAction('nodes', 'drain', {
+        result: 'success',
+        force: drainOptions.force,
+        delete_local_data: drainOptions.deleteLocalData,
+        ignore_daemonsets: drainOptions.ignoreDaemonsets,
+      })
+      toast.success(
+        t('detail.status.nodeDrainInitiated', {
+          name: drainNodeTarget.metadata.name,
+        })
+      )
+      setDrainNodeTarget(null)
+      resetDrainOptions()
+      await refreshNodeList()
+    } catch (error) {
+      console.error('Failed to drain node:', error)
+      trackResourceAction('nodes', 'drain', {
+        result: 'error',
+        force: drainOptions.force,
+        delete_local_data: drainOptions.deleteLocalData,
+        ignore_daemonsets: drainOptions.ignoreDaemonsets,
+      })
+      toast.error(translateError(error, t))
+    } finally {
+      setIsDrainSubmitting(false)
+    }
+  }, [drainNodeTarget, drainOptions, refreshNodeList, resetDrainOptions, t])
+
+  const handleUncordon = useCallback(async () => {
+    if (!uncordonNodeTarget?.metadata?.name) {
+      return
+    }
+
+    setIsUncordonSubmitting(true)
+    try {
+      await uncordonNode(uncordonNodeTarget.metadata.name)
+      trackResourceAction('nodes', 'uncordon', {
+        result: 'success',
+      })
+      toast.success(
+        t('detail.status.nodeUncordoned', {
+          name: uncordonNodeTarget.metadata.name,
+        })
+      )
+      setUncordonNodeTarget(null)
+      await refreshNodeList()
+    } catch (error) {
+      console.error('Failed to uncordon node:', error)
+      trackResourceAction('nodes', 'uncordon', {
+        result: 'error',
+      })
+      toast.error(translateError(error, t))
+    } finally {
+      setIsUncordonSubmitting(false)
+    }
+  }, [refreshNodeList, t, uncordonNodeTarget])
+
+  const getRowContextMenuItems = useCallback(
+    (node: NodeWithMetrics): RowContextMenuItem<NodeWithMetrics>[] => {
+      const nodeIP = getNodeIP(node)
+      const isUnschedulable = Boolean(node.spec?.unschedulable)
+
+      return [
+        {
+          key: 'view-yaml',
+          label: t('common.viewYaml', 'View YAML'),
+          icon: <FileCode2 className="h-4 w-4" />,
+          onSelect: () => navigate(`/nodes/${node.metadata!.name}?tab=yaml`),
+        },
+        { type: 'separator', key: 'primary-actions-separator' },
+        {
+          key: 'copy-name',
+          label: t('common.copyName', 'Copy name'),
+          icon: <Copy className="h-4 w-4" />,
+          onSelect: () => handleCopy(node.metadata?.name || ''),
+        },
+        {
+          key: 'copy-ip',
+          label: t('nodes.copyIPAddress', 'Copy IP address'),
+          icon: <Copy className="h-4 w-4" />,
+          disabled: !nodeIP,
+          onSelect: () => handleCopy(nodeIP),
+        },
+        { type: 'separator', key: 'node-operations-separator' },
+        {
+          key: 'open-terminal',
+          label: t('nodes.openShellTerminal', 'Open shell terminal'),
+          icon: <TerminalSquare className="h-4 w-4" />,
+          onSelect: () => handleOpenNodeTerminal(node),
+        },
+        isUnschedulable
+          ? {
+              key: 'uncordon',
+              label: t('detail.buttons.uncordon'),
+              icon: <RotateCcw className="h-4 w-4" />,
+              onSelect: () => setUncordonNodeTarget(node),
+            }
+          : {
+              key: 'cordon',
+              label: t('detail.buttons.cordon'),
+              icon: <Ban className="h-4 w-4" />,
+              onSelect: () => setCordonNodeTarget(node),
+            },
+        {
+          key: 'drain',
+          label: t('detail.buttons.drain'),
+          icon: <Droplets className="h-4 w-4" />,
+          variant: 'destructive',
+          onSelect: () => setDrainNodeTarget(node),
+        },
+      ]
+    },
+    [handleCopy, handleOpenNodeTerminal, navigate, t]
+  )
+
   return (
-    <ResourceTable
-      resourceName="Nodes"
-      resourceType="nodes"
-      columns={columns}
-      clusterScope={true}
-      searchQueryFilter={nodeSearchFilter}
-      showCreateButton={false}
-      defaultHiddenColumns={[
-        'status_nodeInfo_kernelVersion',
-        'status_nodeInfo_osImage',
-      ]}
-    />
+    <>
+      <ResourceTable
+        resourceName="Nodes"
+        resourceType="nodes"
+        columns={columns}
+        clusterScope={true}
+        searchQueryFilter={nodeSearchFilter}
+        showCreateButton={false}
+        defaultHiddenColumns={[
+          'status_nodeInfo_kernelVersion',
+          'status_nodeInfo_osImage',
+        ]}
+        getRowContextMenuItems={getRowContextMenuItems}
+      />
+
+      <Dialog
+        open={Boolean(terminalNode)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setTerminalNode(null)
+          }
+        }}
+      >
+        <DialogContent className="flex h-[calc(100dvh-2rem)] max-w-[calc(100vw-2rem)] min-h-0 flex-col p-0 md:h-[80dvh] md:max-w-[80vw]">
+          <DialogHeader className="px-6 pt-6 pb-0">
+            <DialogTitle>
+              {terminalNode
+                ? t('nodes.terminalDialogTitle', {
+                    name: terminalNode.metadata?.name,
+                    defaultValue: '{{name}} · Terminal',
+                  })
+                : t('detail.tabs.terminal')}
+            </DialogTitle>
+            <DialogDescription>
+              {t(
+                'nodes.terminalDialogDescription',
+                'Open a shell session on the selected node.'
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="min-h-0 flex-1 px-6 pb-6">
+            {terminalNode ? (
+              <div className="h-full min-h-[480px]">
+                <Terminal
+                  type="node"
+                  nodeName={terminalNode.metadata?.name}
+                  embedded
+                />
+              </div>
+            ) : null}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(cordonNodeTarget)}
+        onOpenChange={(open) => {
+          if (!open && !isCordonSubmitting) {
+            setCordonNodeTarget(null)
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {t('nodes.cordonDialogTitle', {
+                name: cordonNodeTarget?.metadata?.name,
+                defaultValue: 'Set {{name}} as unschedulable',
+              })}
+            </DialogTitle>
+            <DialogDescription>
+              {t(
+                'nodes.cordonDialogDescription',
+                'Prevent new Pods from being scheduled onto this node.'
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setCordonNodeTarget(null)}
+              disabled={isCordonSubmitting}
+            >
+              {t('detail.buttons.cancel')}
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleCordon}
+              disabled={isCordonSubmitting}
+            >
+              {t('detail.dialogs.cordonNode.cordonButton')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(uncordonNodeTarget)}
+        onOpenChange={(open) => {
+          if (!open && !isUncordonSubmitting) {
+            setUncordonNodeTarget(null)
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {t('nodes.uncordonDialogTitle', {
+                name: uncordonNodeTarget?.metadata?.name,
+                defaultValue: 'Restore scheduling for {{name}}',
+              })}
+            </DialogTitle>
+            <DialogDescription>
+              {t(
+                'nodes.uncordonDialogDescription',
+                'Allow new Pods to be scheduled onto this node again.'
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setUncordonNodeTarget(null)}
+              disabled={isUncordonSubmitting}
+            >
+              {t('detail.buttons.cancel')}
+            </Button>
+            <Button onClick={handleUncordon} disabled={isUncordonSubmitting}>
+              {t('detail.buttons.uncordon')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(drainNodeTarget)}
+        onOpenChange={(open) => {
+          if (!open && !isDrainSubmitting) {
+            setDrainNodeTarget(null)
+            resetDrainOptions()
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {t('nodes.drainDialogTitle', {
+                name: drainNodeTarget?.metadata?.name,
+                defaultValue: 'Drain {{name}}',
+              })}
+            </DialogTitle>
+            <DialogDescription>
+              {t(
+                'nodes.drainDialogDescription',
+                'Reuse the current drain flow to evict Pods from the selected node.'
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="node-list-drain-force"
+                checked={drainOptions.force}
+                onChange={(e) =>
+                  setDrainOptions((current) => ({
+                    ...current,
+                    force: e.target.checked,
+                  }))
+                }
+              />
+              <Label htmlFor="node-list-drain-force" className="text-sm">
+                {t('detail.dialogs.drainNode.forceDrain')}
+              </Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="node-list-drain-delete-local-data"
+                checked={drainOptions.deleteLocalData}
+                onChange={(e) =>
+                  setDrainOptions((current) => ({
+                    ...current,
+                    deleteLocalData: e.target.checked,
+                  }))
+                }
+              />
+              <Label
+                htmlFor="node-list-drain-delete-local-data"
+                className="text-sm"
+              >
+                {t('detail.dialogs.drainNode.deleteLocalData')}
+              </Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="node-list-drain-ignore-daemonsets"
+                checked={drainOptions.ignoreDaemonsets}
+                onChange={(e) =>
+                  setDrainOptions((current) => ({
+                    ...current,
+                    ignoreDaemonsets: e.target.checked,
+                  }))
+                }
+              />
+              <Label
+                htmlFor="node-list-drain-ignore-daemonsets"
+                className="text-sm"
+              >
+                {t('detail.dialogs.drainNode.ignoreDaemonSets')}
+              </Label>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="node-list-drain-grace-period" className="text-sm">
+                {t('detail.dialogs.drainNode.gracePeriod')}
+              </Label>
+              <Input
+                id="node-list-drain-grace-period"
+                type="number"
+                value={drainOptions.gracePeriod}
+                onChange={(e) =>
+                  setDrainOptions((current) => ({
+                    ...current,
+                    gracePeriod: Number.parseInt(e.target.value, 10) || 30,
+                  }))
+                }
+                min={0}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setDrainNodeTarget(null)}
+              disabled={isDrainSubmitting}
+            >
+              {t('detail.buttons.cancel')}
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDrain}
+              disabled={isDrainSubmitting}
+            >
+              {t('detail.dialogs.drainNode.drainButton')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }
