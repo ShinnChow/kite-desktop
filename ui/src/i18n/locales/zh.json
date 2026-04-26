@@ -327,7 +327,15 @@
     "externalIP": "外部IP",
     "os": "操作系统",
     "kernelVersion": "内核版本",
-    "containerRuntime": "容器运行时"
+    "containerRuntime": "容器运行时",
+    "images": "镜像",
+    "imageSize": "大小",
+    "imageReferences": "全部引用",
+    "imageReferenceCount": "引用数",
+    "imageReferencesCount_one": "{{count}} 个引用",
+    "imageReferencesCount_other": "{{count}} 个引用",
+    "imageSearchPlaceholder": "搜索镜像名称或引用...",
+    "noImagesFound": "该节点未上报镜像信息"
   },
   "events": {
     "title": "事件",

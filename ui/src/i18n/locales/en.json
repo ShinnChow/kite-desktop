@@ -301,7 +301,15 @@
     "externalIP": "External IP",
     "os": "OS",
     "kernelVersion": "Kernel Version",
-    "containerRuntime": "Container Runtime"
+    "containerRuntime": "Container Runtime",
+    "images": "Images",
+    "imageSize": "Size",
+    "imageReferences": "All references",
+    "imageReferenceCount": "Refs",
+    "imageReferencesCount_one": "{{count}} reference",
+    "imageReferencesCount_other": "{{count}} references",
+    "imageSearchPlaceholder": "Search image names or references...",
+    "noImagesFound": "This node did not report any images"
   },
   "events": {
     "title": "Events",

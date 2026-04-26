@@ -2,12 +2,12 @@ import { useEffect, useState } from 'react'
 import {
   IconBan,
   IconCircleCheckFilled,
-  IconDroplet,
   IconExclamationCircle,
   IconLoader,
   IconLock,
   IconReload,
 } from '@tabler/icons-react'
+import { Droplets } from 'lucide-react'
 import * as yaml from 'js-yaml'
 import { Node } from 'kubernetes-types/core/v1'
 import { useTranslation } from 'react-i18next'
@@ -53,6 +53,7 @@ import { DescribeDialog } from '@/components/describe-dialog'
 import { ErrorMessage } from '@/components/error-message'
 import { EventTable } from '@/components/event-table'
 import { LabelsAnno } from '@/components/lables-anno'
+import { NodeImageTable } from '@/components/node-image-table'
 import { NodeMonitoring } from '@/components/node-monitoring'
 import { PodTable } from '@/components/pod-table'
 import { RefreshButton } from '@/components/refresh-button'
@@ -305,8 +306,12 @@ export function NodeDetail(props: { name: string }) {
             onOpenChange={setIsDrainPopoverOpen}
           >
             <PopoverTrigger asChild>
-              <Button variant="outline" size="sm">
-                <IconDroplet className="w-4 h-4" />
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive focus-visible:ring-destructive/20"
+              >
+                <Droplets className="w-4 h-4" />
                 {t('detail.buttons.drain')}
               </Button>
             </PopoverTrigger>
@@ -977,11 +982,24 @@ export function NodeDetail(props: { name: string }) {
                       pods={relatedPods}
                       isLoading={isLoadingRelated}
                       hiddenNode
+                      showNamespace
                     />
                   ),
                 },
               ]
             : []),
+          {
+            value: 'images',
+            label: (
+              <>
+                {t('nodes.images')}{' '}
+                <Badge variant="secondary">
+                  {data.status?.images?.length || 0}
+                </Badge>
+              </>
+            ),
+            content: <NodeImageTable images={data.status?.images} />,
+          },
           {
             value: 'monitor',
             label: t('detail.tabs.monitor'),

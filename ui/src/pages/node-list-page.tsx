@@ -37,6 +37,39 @@ import { ResourceTable } from '@/components/resource-table'
 import { RowContextMenuItem } from '@/components/row-context-menu'
 import { Terminal } from '@/components/terminal'
 
+function NodePodsUsageCell({ node }: { node: NodeWithMetrics }) {
+  const podsUsed = node.metrics?.pods || 0
+  const podsLimit = node.metrics?.podsLimit || 0
+  const percentage =
+    podsLimit > 0 ? Math.min((podsUsed / podsLimit) * 100, 100) : 0
+  const progressClassName =
+    percentage >= 85
+      ? 'bg-gradient-to-r from-orange-500 via-red-500 to-rose-500'
+      : percentage >= 60
+        ? 'bg-gradient-to-r from-amber-400 via-orange-400 to-orange-500'
+        : 'bg-gradient-to-r from-sky-500 via-cyan-500 to-emerald-500'
+
+  return (
+    <Link
+      to={`/nodes/${node.metadata!.name}?tab=pods`}
+      className="group mx-auto flex min-w-[180px] max-w-[220px] items-center gap-2 text-sm text-foreground transition-colors hover:text-primary"
+    >
+      <span className="w-[58px] shrink-0 text-right font-medium tabular-nums">
+        {podsUsed}/{podsLimit}
+      </span>
+      <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted/80 ring-1 ring-border/50">
+        <div
+          className={`h-full rounded-full transition-all duration-300 group-hover:brightness-110 ${progressClassName}`}
+          style={{ width: `${percentage}%` }}
+        />
+      </div>
+      <span className="w-[38px] shrink-0 text-left font-medium tabular-nums">
+        {Math.round(percentage)}%
+      </span>
+    </Link>
+  )
+}
+
 function getNodeStatus(node: NodeWithMetrics): string {
   const conditions = node.status?.conditions || []
   const isUnschedulable = node.spec?.unschedulable || false
@@ -244,15 +277,7 @@ export function NodeListPage() {
       columnHelper.accessor((row) => row.metrics, {
         id: 'pods',
         header: 'Pods',
-        cell: ({ row }) => (
-          <Link
-            to={`/nodes/${row.original.metadata!.name}?tab=pods`}
-            className="text-muted-foreground hover:text-primary/80 hover:underline transition-colors cursor-pointer"
-          >
-            {row.original.metrics?.pods || 0} /{' '}
-            {row.original.metrics?.podsLimit || 0}
-          </Link>
-        ),
+        cell: ({ row }) => <NodePodsUsageCell node={row.original} />,
       }),
       columnHelper.accessor((row) => row.metrics?.cpuUsage || 0, {
         id: 'cpu',
