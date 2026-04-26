@@ -69,6 +69,18 @@ export function ResourceTableView<T>({
   getRowContextMenuItems,
 }: ResourceTableViewProps<T>) {
   const { t } = useTranslation()
+  const getStickyColumnClassName = (
+    index: number,
+    columnId: string,
+    isHeader = false
+  ) =>
+    cn(
+      index <= 1 ? 'text-left' : 'text-center',
+      columnId === 'actions' &&
+        'sticky right-0 z-20 bg-background shadow-[-10px_0_12px_-12px_color-mix(in_oklab,var(--color-foreground)_16%,transparent)]',
+      isHeader && columnId === 'actions' && 'z-30'
+    )
+
   const renderRows = () => {
     const rows = table.getRowModel().rows
 
@@ -90,7 +102,10 @@ export function ResourceTableView<T>({
           {row.getVisibleCells().map((cell, index) => (
             <TableCell
               key={cell.id}
-              className={`align-middle ${index <= 1 ? 'text-left' : 'text-center'}`}
+              className={cn(
+                'align-middle',
+                getStickyColumnClassName(index, cell.column.id)
+              )}
             >
               {cell.column.columnDef.cell
                 ? flexRender(cell.column.columnDef.cell, cell.getContext())
@@ -202,8 +217,12 @@ export function ResourceTableView<T>({
                         <TableHead
                           key={header.id}
                           className={cn(
-                            index <= 1 ? 'text-left' : 'text-center',
-                            'group/header'
+                            'group/header',
+                            getStickyColumnClassName(
+                              index,
+                              header.column.id,
+                              true
+                            )
                           )}
                         >
                           {header.isPlaceholder ? null : (

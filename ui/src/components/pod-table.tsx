@@ -1,6 +1,20 @@
 import { useMemo, useState, type ReactNode } from 'react'
+import {
+  ColumnDef,
+  ColumnFiltersState,
+  FilterFn,
+  PaginationState,
+  SortingState,
+  createColumnHelper,
+  getCoreRowModel,
+  getFacetedRowModel,
+  getFacetedUniqueValues,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  useReactTable,
+} from '@tanstack/react-table'
 import { IconLoader, IconTrash } from '@tabler/icons-react'
-import { Pod } from 'kubernetes-types/core/v1'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -14,7 +28,7 @@ import { DeleteConfirmationDialog } from './delete-confirmation-dialog'
 import { DescribeDialog } from './describe-dialog'
 import { MetricCell } from './metrics-cell'
 import { PodStatusIcon } from './pod-status-icon'
-import { Column, SimpleTable } from './simple-table'
+import { ResourceTableView } from './resource-table-view'
 import { Badge } from './ui/badge'
 import { Button } from './ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
@@ -37,28 +51,55 @@ function toCompactImageName(image: string) {
   return lastSlashIndex >= 0 ? image.slice(lastSlashIndex + 1) : image
 }
 
+const arrIncludesSome: FilterFn<PodWithMetrics> = (row, columnId, filterValue) => {
+  if (!Array.isArray(filterValue) || filterValue.length === 0) return true
+  const value = String(row.getValue(columnId) ?? '')
+  return filterValue.includes(value)
+}
+
 export function PodTable(props: {
   pods?: PodWithMetrics[]
   labelSelector?: string
   isLoading?: boolean
   hiddenNode?: boolean
+  showNamespace?: boolean
   title?: ReactNode
 }) {
   const { t } = useTranslation()
   const { pods, isLoading, title } = props
+  const [sorting, setSorting] = useState<SortingState>([])
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
+  const [pagination, setPagination] = useState<PaginationState>({
+    pageIndex: 0,
+    pageSize: 20,
+  })
   const [podPendingDelete, setPodPendingDelete] = useState<{
     name: string
     namespace?: string
   } | null>(null)
+  const columnHelper = createColumnHelper<PodWithMetrics>()
 
-  // Pod table columns
   const podColumns = useMemo(
-    (): Column<PodWithMetrics>[] => [
-      {
+    (): ColumnDef<PodWithMetrics>[] => [
+      ...(props.showNamespace
+        ? [
+            columnHelper.accessor(
+              (pod) => pod.metadata?.namespace || '-',
+              {
+                id: 'namespace',
+                header: t('resourceTable.namespace'),
+                cell: ({ getValue }) => (
+                  <Badge variant="outline">{getValue()}</Badge>
+                ),
+              }
+            ),
+          ]
+        : []),
+      columnHelper.accessor((pod) => pod.metadata?.name || '-', {
+        id: 'name',
         header: t('common.name'),
-        accessor: (pod: Pod) => pod.metadata,
-        cell: (value: unknown) => {
-          const meta = value as Pod['metadata']
+        cell: ({ row }) => {
+          const meta = row.original.metadata
           return (
             <div className="font-medium app-link">
               <Link to={`/pods/${meta!.namespace}/${meta!.name}`}>
@@ -67,149 +108,163 @@ export function PodTable(props: {
             </div>
           )
         },
-        align: 'left' as const,
-      },
-      {
+      }),
+      columnHelper.accessor((pod) => {
+        const status = getPodStatus(pod)
+        return status.readyContainers / Math.max(status.totalContainers, 1)
+      }, {
+        id: 'readyRatio',
         header: t('pods.ready'),
-        accessor: (pod: Pod) => {
-          const status = getPodStatus(pod)
+        cell: ({ row }) => {
+          const status = getPodStatus(row.original)
           return `${status.readyContainers} / ${status.totalContainers}`
         },
-        cell: (value: unknown) => value as string,
-      },
-      {
+      }),
+      columnHelper.accessor((pod) => {
+        const status = getPodStatus(pod)
+        const numericRestarts = Number.parseInt(status.restartString, 10)
+        return Number.isNaN(numericRestarts) ? 0 : numericRestarts
+      }, {
+        id: 'restarts',
         header: t('pods.restarts'),
-        accessor: (pod: Pod) => {
-          const status = getPodStatus(pod)
-          return status.restartString || '0'
-        },
-        cell: (value: unknown) => {
+        cell: ({ getValue }) => {
           return (
             <span className="text-muted-foreground text-sm">
-              {value as number}
+              {String(getValue())}
             </span>
           )
         },
-      },
-      {
+      }),
+      columnHelper.accessor((pod) => getPodStatus(pod).reason, {
+        id: 'status',
         header: t('common.status'),
-        accessor: (pod: Pod) => pod,
-        cell: (value: unknown) => {
-          const status = getPodStatus(value as Pod)
+        cell: ({ getValue }) => {
+          const status = getValue()
           return (
             <Badge variant="outline" className="text-muted-foreground px-1.5">
-              <PodStatusIcon status={status.reason} />
-              {translatePodStatus(status.reason, t)}
+              <PodStatusIcon status={status} />
+              {translatePodStatus(status, t)}
             </Badge>
           )
         },
-      },
-      {
-        header: t('containerEditor.tabs.image'),
-        accessor: (pod: Pod) =>
-          pod.spec?.containers?.map((container) => ({
-            name: container.name,
-            image: container.image || '-',
-          })) || [],
-        cell: (value: unknown) => {
-          const images = value as PodImageEntry[]
+      }),
+      columnHelper.accessor(
+        (pod) =>
+          pod.spec?.containers
+            ?.map((container) =>
+              `${container.name}: ${toCompactImageName(container.image || '-')}`
+            )
+            .join(' | ') || '-',
+        {
+          id: 'imageSummary',
+          header: t('containerEditor.tabs.image'),
+          cell: ({ row }) => {
+            const images: PodImageEntry[] =
+              row.original.spec?.containers?.map((container) => ({
+                name: container.name,
+                image: container.image || '-',
+              })) || []
 
-          if (images.length === 0) {
-            return <span className="text-sm text-muted-foreground">-</span>
-          }
+            if (images.length === 0) {
+              return <span className="text-sm text-muted-foreground">-</span>
+            }
 
-          const summary = images
-            .map((entry) => `${entry.name}: ${toCompactImageName(entry.image)}`)
-            .join(' | ')
+            const summary = images
+              .map(
+                (entry) => `${entry.name}: ${toCompactImageName(entry.image)}`
+              )
+              .join(' | ')
 
+            return (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div
+                    className="max-w-[320px] truncate text-xs text-muted-foreground"
+                    title={summary}
+                  >
+                    <span className="font-mono">{summary}</span>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-md">
+                  <div className="space-y-2">
+                    {images.map((entry) => (
+                      <div
+                        key={`${entry.name}-${entry.image}`}
+                        className="min-w-0"
+                      >
+                        <div className="text-xs text-muted-foreground">
+                          {entry.name}
+                        </div>
+                        <div className="font-mono text-xs break-all">
+                          {entry.image}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+            )
+          },
+        }
+      ),
+      columnHelper.accessor((pod) => pod.metrics, {
+        id: 'cpu',
+        header: t('monitoring.cpuUsage'),
+        cell: ({ getValue }) => {
+          return <MetricCell type="cpu" metrics={getValue() as MetricsData} />
+        },
+        enableSorting: false,
+        enableColumnFilter: false,
+      }),
+      columnHelper.accessor((pod) => pod.metrics, {
+        id: 'memory',
+        header: t('monitoring.memoryUsage'),
+        cell: ({ getValue }) => {
           return (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div
-                  className="max-w-[320px] truncate text-xs text-muted-foreground"
-                  title={summary}
-                >
-                  <span className="font-mono">{summary}</span>
-                </div>
-              </TooltipTrigger>
-              <TooltipContent side="top" className="max-w-md">
-                <div className="space-y-2">
-                  {images.map((entry) => (
-                    <div
-                      key={`${entry.name}-${entry.image}`}
-                      className="min-w-0"
-                    >
-                      <div className="text-xs text-muted-foreground">
-                        {entry.name}
-                      </div>
-                      <div className="font-mono text-xs break-all">
-                        {entry.image}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </TooltipContent>
-            </Tooltip>
+            <MetricCell type="memory" metrics={getValue() as MetricsData} />
           )
         },
-        align: 'left' as const,
-      },
-      {
-        header: t('monitoring.cpuUsage'),
-        accessor: (pod: PodWithMetrics) => {
-          return pod.metrics
-        },
-        cell: (value: unknown) => {
-          return <MetricCell type="cpu" metrics={value as MetricsData} />
-        },
-      },
-      {
-        header: t('monitoring.memoryUsage'),
-        accessor: (pod: PodWithMetrics) => {
-          return pod.metrics
-        },
-        cell: (value: unknown) => {
-          return <MetricCell type="memory" metrics={value as MetricsData} />
-        },
-      },
-      {
+        enableSorting: false,
+        enableColumnFilter: false,
+      }),
+      columnHelper.accessor((pod) => pod.status?.podIP || '-', {
+        id: 'podIP',
         header: t('detail.fields.podIP'),
-        accessor: (pod: Pod) => pod.status?.podIP || '-',
-        cell: (value: unknown) => (
+        cell: ({ getValue }) => (
           <span className="text-sm text-muted-foreground font-mono">
-            {value as string}
+            {getValue()}
           </span>
         ),
-      },
+      }),
       ...(props.hiddenNode
         ? []
         : [
-            {
+            columnHelper.accessor((pod) => pod.spec?.nodeName || '-', {
+              id: 'node',
               header: t('pods.node'),
-              accessor: (pod: Pod) => pod.spec?.nodeName || '-',
-              cell: (value: unknown) => (
-                <Link to={`/nodes/${value}`} className="app-link">
-                  {value as string}
+              cell: ({ getValue }) => (
+                <Link to={`/nodes/${getValue()}`} className="app-link">
+                  {getValue()}
                 </Link>
               ),
-            },
+            }),
           ]),
-      {
+      columnHelper.accessor((pod) => pod.metadata?.creationTimestamp || '', {
+        id: 'created',
         header: t('common.created'),
-        accessor: (pod: Pod) => pod.metadata?.creationTimestamp || '',
-        cell: (value: unknown) => {
+        cell: ({ getValue }) => {
           return (
             <span className="text-muted-foreground text-sm">
-              {formatDate(value as string, true)}
+              {formatDate(getValue(), true)}
             </span>
           )
         },
-      },
-      {
+      }),
+      columnHelper.display({
+        id: 'actions',
         header: t('common.actions'),
-        accessor: (pod: Pod) => pod,
-        cell: (value: unknown) => {
-          const pod = value as Pod
+        cell: ({ row }) => {
+          const pod = row.original
           const podName = pod.metadata?.name || ''
           const namespace = pod.metadata?.namespace
 
@@ -237,10 +292,55 @@ export function PodTable(props: {
             </div>
           )
         },
-      },
+        enableSorting: false,
+        enableColumnFilter: false,
+      }),
     ],
-    [props.hiddenNode, t]
+    [columnHelper, props.hiddenNode, props.showNamespace, t]
   )
+
+  const memoizedPods = useMemo(() => pods || [], [pods])
+
+  const columnsWithFilterFn = useMemo(
+    () =>
+      podColumns.map((column) => {
+        if (column.id === 'actions') {
+          return column
+        }
+
+        return {
+          ...column,
+          filterFn: column.filterFn ?? arrIncludesSome,
+        }
+      }),
+    [podColumns]
+  )
+
+  const table = useReactTable({
+    data: memoizedPods,
+    columns: columnsWithFilterFn,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getFacetedRowModel: getFacetedRowModel(),
+    getFacetedUniqueValues: getFacetedUniqueValues(),
+    onSortingChange: setSorting,
+    onColumnFiltersChange: setColumnFilters,
+    onPaginationChange: setPagination,
+    getRowId: (row) =>
+      row.metadata?.uid ||
+      `${row.metadata?.namespace || '_all'}/${row.metadata?.name || 'pod'}`,
+    state: {
+      sorting,
+      columnFilters,
+      pagination,
+    },
+    autoResetPageIndex: false,
+  })
+
+  const filteredRowCount = table.getFilteredRowModel().rows.length
+  const totalRowCount = memoizedPods.length
 
   const handleDelete = async (force?: boolean, wait?: boolean) => {
     const targetPod = podPendingDelete
@@ -276,17 +376,18 @@ export function PodTable(props: {
         <CardTitle>{title ?? t('pods.title')}</CardTitle>
       </CardHeader>
       <CardContent>
-        <SimpleTable
-          data={pods || []}
-          columns={podColumns}
-          emptyMessage={t('podTable.empty')}
-          stickyFirstColumn
-          stickyLastColumn
-          pagination={{
-            enabled: true,
-            pageSize: 20,
-            showPageInfo: true,
-          }}
+        <ResourceTableView
+          table={table}
+          columnCount={podColumns.length}
+          isLoading={Boolean(isLoading)}
+          data={memoizedPods}
+          emptyState={null}
+          hasActiveFilters={columnFilters.length > 0}
+          filteredRowCount={filteredRowCount}
+          totalRowCount={totalRowCount}
+          searchQuery=""
+          pagination={pagination}
+          setPagination={setPagination}
         />
       </CardContent>
       <DeleteConfirmationDialog
