@@ -41,7 +41,7 @@ function ClusterGate({ children }: { children: ReactNode }) {
     })
   }, [currentCluster])
 
-  if (isLoading) {
+  if (shouldShowClusterLoading(isLoading, currentCluster)) {
     return (
       <div className="flex h-screen items-center justify-center">
         <div className="flex items-center space-x-2">
@@ -63,6 +63,13 @@ function ClusterGate({ children }: { children: ReactNode }) {
   }
 
   return <>{children}</>
+}
+
+export function shouldShowClusterLoading(
+  isLoading: boolean,
+  currentCluster: string | null
+) {
+  return isLoading && !currentCluster
 }
 
 function AppContent() {

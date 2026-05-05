@@ -32,6 +32,8 @@ import {
   PersistentVolumeClaimList,
   PersistentVolumeList,
   Pod,
+  ResourceQuota,
+  ResourceQuotaList,
   Secret,
   SecretList,
   Service,
@@ -100,6 +102,7 @@ export type ResourceType =
   | 'jobs'
   | 'cronjobs'
   | 'services'
+  | 'resourcequotas'
   | 'configmaps'
   | 'secrets'
   | 'ingresses'
@@ -150,6 +153,7 @@ export interface ResourcesTypeMap {
   jobs: JobList
   cronjobs: CronJobList
   services: ServiceList
+  resourcequotas: ResourceQuotaList
   configmaps: ConfigMapList
   secrets: SecretList
   persistentvolumeclaims: PersistentVolumeClaimList
@@ -235,6 +239,7 @@ export interface ResourceTypeMap {
   jobs: Job
   cronjobs: CronJob
   services: Service
+  resourcequotas: ResourceQuota
   configmaps: ConfigMap
   secrets: Secret
   persistentvolumeclaims: PersistentVolumeClaim

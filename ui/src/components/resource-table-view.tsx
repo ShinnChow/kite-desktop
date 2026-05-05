@@ -86,6 +86,28 @@ function getHeaderContentAlignmentClassName(
   }
 }
 
+export function shouldOverlayHeaderControls(
+  alignment: ColumnAlignment | undefined,
+  index: number,
+  canSort: boolean,
+  canFilter: boolean
+) {
+  const resolvedAlignment = alignment ?? (index <= 1 ? 'left' : 'center')
+  return resolvedAlignment === 'center' && (canSort || canFilter)
+}
+
+function renderSortIcon(sortState: false | 'asc' | 'desc') {
+  if (sortState === 'asc') {
+    return <ArrowUp className="h-3.5 w-3.5" />
+  }
+
+  if (sortState === 'desc') {
+    return <ArrowDown className="h-3.5 w-3.5" />
+  }
+
+  return <ArrowUpDown className="h-3.5 w-3.5 opacity-0 group-hover/header:opacity-50" />
+}
+
 export function ResourceTableView<T>({
   table,
   columnCount,
@@ -259,71 +281,115 @@ export function ResourceTableView<T>({
                   {table.getHeaderGroups().map((headerGroup) => (
                     <TableRow key={headerGroup.id}>
                       {headerGroup.headers.map((header, index) => (
-                        <TableHead
-                          key={header.id}
-                          className={cn(
-                            'group/header',
-                            getStickyColumnClassName(
+                        (() => {
+                          const alignment = (
+                            header.column.columnDef.meta as
+                              | { align?: ColumnAlignment }
+                              | undefined
+                          )?.align
+                          const canSort = header.column.getCanSort()
+                          const canFilter =
+                            header.column.getCanFilter() &&
+                            header.column.id !== 'select'
+                          const shouldOverlayControls =
+                            shouldOverlayHeaderControls(
+                              alignment,
                               index,
-                              header.column.id,
-                              (
-                                header.column.columnDef.meta as
-                                  | { align?: ColumnAlignment }
-                                  | undefined
-                              )?.align,
-                              true
+                              canSort,
+                              canFilter
                             )
-                          )}
-                        >
-                          {header.isPlaceholder ? null : (
-                            <div
+
+                          return (
+                            <TableHead
+                              key={header.id}
                               className={cn(
-                                'flex items-center gap-0.5',
-                                getHeaderContentAlignmentClassName(
-                                  (
-                                    header.column.columnDef.meta as
-                                      | { align?: ColumnAlignment }
-                                      | undefined
-                                  )?.align,
-                                  index
+                                'group/header',
+                                getStickyColumnClassName(
+                                  index,
+                                  header.column.id,
+                                  alignment,
+                                  true
                                 )
                               )}
                             >
-                              {header.column.getCanSort() ? (
-                                <Button
-                                  variant="ghost"
-                                  onClick={header.column.getToggleSortingHandler()}
-                                  className={
-                                    header.column.getIsSorted()
-                                      ? 'text-primary'
-                                      : ''
-                                  }
-                                >
-                                  {flexRender(
-                                    header.column.columnDef.header,
-                                    header.getContext()
-                                  )}
-                                  {header.column.getIsSorted() === 'asc' ? (
-                                    <ArrowUp className="ml-1 h-3.5 w-3.5" />
-                                  ) : header.column.getIsSorted() === 'desc' ? (
-                                    <ArrowDown className="ml-1 h-3.5 w-3.5" />
-                                  ) : (
-                                    <ArrowUpDown className="ml-1 h-3.5 w-3.5 opacity-0 group-hover/header:opacity-50" />
-                                  )}
-                                </Button>
+                              {header.isPlaceholder ? null : shouldOverlayControls ? (
+                                <div className="flex items-center justify-center">
+                                  <div className="inline-flex items-center gap-1 whitespace-nowrap">
+                                    {canSort ? (
+                                      <Button
+                                        variant="ghost"
+                                        onClick={header.column.getToggleSortingHandler()}
+                                        className={cn(
+                                          'px-0 hover:bg-transparent',
+                                          header.column.getIsSorted() &&
+                                            'text-primary'
+                                        )}
+                                      >
+                                        {flexRender(
+                                          header.column.columnDef.header,
+                                          header.getContext()
+                                        )}
+                                        {renderSortIcon(
+                                          header.column.getIsSorted()
+                                        )}
+                                      </Button>
+                                    ) : (
+                                      flexRender(
+                                        header.column.columnDef.header,
+                                        header.getContext()
+                                      )
+                                    )}
+                                    {canFilter ? (
+                                      <ColumnFilterPopover column={header.column} />
+                                    ) : null}
+                                  </div>
+                                </div>
                               ) : (
-                                flexRender(
-                                  header.column.columnDef.header,
-                                  header.getContext()
-                                )
+                                <div
+                                  className={cn(
+                                    'flex items-center gap-0.5',
+                                    getHeaderContentAlignmentClassName(
+                                      alignment,
+                                      index
+                                    )
+                                  )}
+                                >
+                                  {canSort ? (
+                                    <Button
+                                      variant="ghost"
+                                      onClick={header.column.getToggleSortingHandler()}
+                                      className={
+                                        header.column.getIsSorted()
+                                          ? 'text-primary'
+                                          : ''
+                                      }
+                                    >
+                                      {flexRender(
+                                        header.column.columnDef.header,
+                                        header.getContext()
+                                      )}
+                                      {header.column.getIsSorted() === 'asc' ? (
+                                        <ArrowUp className="ml-1 h-3.5 w-3.5" />
+                                      ) : header.column.getIsSorted() === 'desc' ? (
+                                        <ArrowDown className="ml-1 h-3.5 w-3.5" />
+                                      ) : (
+                                        <ArrowUpDown className="ml-1 h-3.5 w-3.5 opacity-0 group-hover/header:opacity-50" />
+                                      )}
+                                    </Button>
+                                  ) : (
+                                    flexRender(
+                                      header.column.columnDef.header,
+                                      header.getContext()
+                                    )
+                                  )}
+                                  {canFilter ? (
+                                    <ColumnFilterPopover column={header.column} />
+                                  ) : null}
+                                </div>
                               )}
-                              {header.column.getCanFilter() &&
-                                header.column.id !== 'select' && (
-                                  <ColumnFilterPopover column={header.column} />
-                                )}
-                            </div>
-                          )}
-                        </TableHead>
+                            </TableHead>
+                          )
+                        })()
                       ))}
                     </TableRow>
                   ))}
