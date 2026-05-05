@@ -54,6 +54,7 @@ func RegisterRoutes(group *gin.RouterGroup) {
 		"namespaces":               NewGenericResourceHandler[*corev1.Namespace, *corev1.NamespaceList]("namespaces", true, false),
 		"nodes":                    NewNodeHandler(),
 		"services":                 NewGenericResourceHandler[*corev1.Service, *corev1.ServiceList]("services", false, true),
+		"resourcequotas":           NewGenericResourceHandler[*corev1.ResourceQuota, *corev1.ResourceQuotaList]("resourcequotas", false, false),
 		"endpoints":                NewGenericResourceHandler[*corev1.Endpoints, *corev1.EndpointsList]("endpoints", false, false),
 		"endpointslices":           NewGenericResourceHandler[*discoveryv1.EndpointSlice, *discoveryv1.EndpointSliceList]("endpointslices", false, false),
 		"configmaps":               NewGenericResourceHandler[*corev1.ConfigMap, *corev1.ConfigMapList]("configmaps", false, true),
