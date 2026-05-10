@@ -42,7 +42,10 @@ func (h *NodeTerminalHandler) HandleNodeTerminalWebSocket(c *gin.Context) {
 		defer func() {
 			_ = conn.Close()
 		}()
-		node, err := cs.K8sClient.ClientSet.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
+		ctx, cancel := context.WithCancel(c.Request.Context())
+		defer cancel()
+
+		node, err := cs.K8sClient.ClientSet.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
 		if err != nil {
 			log.Printf("Failed to get node %s: %v", nodeName, err)
 			h.sendErrorMessage(conn, fmt.Sprintf("Failed to get node %s: %v", nodeName, err))
@@ -63,8 +66,6 @@ func (h *NodeTerminalHandler) HandleNodeTerminalWebSocket(c *gin.Context) {
 		if nodeTerminalImage == "" {
 			nodeTerminalImage = common.NodeTerminalImage
 		}
-		ctx, cancel := context.WithCancel(c.Request.Context())
-		defer cancel()
 
 		nodeAgentName, err := h.createNodeAgent(ctx, cs, nodeName, nodeTerminalImage)
 		if err != nil {
@@ -172,42 +173,19 @@ func (h *NodeTerminalHandler) createNodeAgent(ctx context.Context, cs *cluster.C
 
 // waitForPodReady waits for the kite node agent pod to be ready
 func (h *NodeTerminalHandler) waitForPodReady(ctx context.Context, cs *cluster.ClientSet, conn *websocket.Conn, podName string) error {
-	timeout := time.After(60 * time.Second)
-	ticker := time.NewTicker(2 * time.Second)
-	defer ticker.Stop()
-	h.sendMessage(conn, "info", fmt.Sprintf("waiting for pod %s to be ready", podName))
-
-	var pod *corev1.Pod
-	var err error
-	for {
-		select {
-		case <-ctx.Done():
-			return nil
-		case <-timeout:
-			h.sendMessage(conn, "info", "")
-			h.sendErrorMessage(conn, utils.GetPodErrorMessage(pod))
-			return fmt.Errorf("timeout waiting for pod %s to be ready", podName)
-		case <-ticker.C:
-			pod, err = cs.K8sClient.ClientSet.CoreV1().Pods(common.AgentPodNamespace).Get(
-				context.TODO(),
-				podName,
-				metav1.GetOptions{},
-			)
-			if err != nil {
-				continue
-			}
-			h.sendMessage(conn, "stdout", ".")
-			if utils.IsPodReady(pod) {
-				h.sendMessage(conn, "info", "ready!")
-				return nil
-			}
-		}
-	}
+	return waitForTerminalPodReady(ctx, cs, conn, podName, terminalPodReadyMessages{
+		Waiting: fmt.Sprintf("waiting for pod %s to be ready", podName),
+		Ready:   "ready!",
+		Timeout: fmt.Sprintf("timeout waiting for pod %s to be ready", podName),
+	}, h.sendMessage, h.sendErrorMessage)
 }
 
 func (h *NodeTerminalHandler) cleanupNodeAgentPod(cs *cluster.ClientSet, podName string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
 	return cs.K8sClient.ClientSet.CoreV1().Pods(common.AgentPodNamespace).Delete(
-		context.TODO(),
+		ctx,
 		podName,
 		metav1.DeleteOptions{},
 	)
