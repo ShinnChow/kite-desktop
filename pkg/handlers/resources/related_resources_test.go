@@ -19,6 +19,32 @@ import (
 	gatewayapiv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
+func newRelatedResourcesTestScheme(t *testing.T) *runtime.Scheme {
+	t.Helper()
+
+	scheme := runtime.NewScheme()
+	if err := appsv1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	if err := corev1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	if err := discoveryv1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	if err := networkingv1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	if err := autoscalingv2.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	if err := gatewayapiv1.Install(scheme); err != nil {
+		t.Fatal(err)
+	}
+
+	return scheme
+}
+
 func TestDiscoverIngressServices(t *testing.T) {
 	ingress := &networkingv1.Ingress{
 		Spec: networkingv1.IngressSpec{
@@ -49,6 +75,27 @@ func TestDiscoverIngressServices(t *testing.T) {
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("discoverIngressServices() = %#v, want %#v", got, want)
+	}
+}
+
+func TestFilterExistingRelatedServices(t *testing.T) {
+	related := []common.RelatedResource{
+		{Type: "services", Namespace: "default", Name: "svc-a", APIVersion: corev1.SchemeGroupVersion.String(), Direction: common.RelatedDirectionReferences, Reason: "ingress backend service"},
+		{Type: "services", Namespace: "default", Name: "missing", APIVersion: corev1.SchemeGroupVersion.String(), Direction: common.RelatedDirectionReferences, Reason: "ingress backend service"},
+	}
+	k8sClient := &kube.K8sClient{
+		Client: fake.NewClientBuilder().
+			WithScheme(newRelatedResourcesTestScheme(t)).
+			WithObjects(&corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "svc-a", Namespace: "default"}}).
+			Build(),
+	}
+
+	got := filterExistingRelatedServices(context.Background(), k8sClient, related)
+	want := []common.RelatedResource{
+		{Type: "services", Namespace: "default", Name: "svc-a", APIVersion: corev1.SchemeGroupVersion.String(), Direction: common.RelatedDirectionReferences, Reason: "ingress backend service"},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("filterExistingRelatedServices() = %#v, want %#v", got, want)
 	}
 }
 
@@ -218,25 +265,7 @@ func TestGetAutoScalingRelatedResources(t *testing.T) {
 }
 
 func TestDiscoverDeploymentReferencedBy(t *testing.T) {
-	scheme := runtime.NewScheme()
-	if err := appsv1.AddToScheme(scheme); err != nil {
-		t.Fatal(err)
-	}
-	if err := corev1.AddToScheme(scheme); err != nil {
-		t.Fatal(err)
-	}
-	if err := discoveryv1.AddToScheme(scheme); err != nil {
-		t.Fatal(err)
-	}
-	if err := networkingv1.AddToScheme(scheme); err != nil {
-		t.Fatal(err)
-	}
-	if err := autoscalingv2.AddToScheme(scheme); err != nil {
-		t.Fatal(err)
-	}
-	if err := gatewayapiv1.Install(scheme); err != nil {
-		t.Fatal(err)
-	}
+	scheme := newRelatedResourcesTestScheme(t)
 
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
